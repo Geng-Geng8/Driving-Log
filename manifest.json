@@ -1,0 +1,17 @@
+{
+  "name": "Trip Log",
+  "short_name": "TripLog",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06131c",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
