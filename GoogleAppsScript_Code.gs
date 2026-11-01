@@ -1,7 +1,7 @@
 /**
  * DRIVING LOG - GOOGLE APPS SCRIPT (Code.gs)
  * ==============================================================================
- * This script powers the Driving Log web app and connects directly to your "Trips" sheet.
+ * This script connects directly to your Google Sheet "Trips".
  *
  * GOOGLE SHEET COLUMNS (Row 1 headers):
  * A: Trip ID   | B: Date   | C: Notes   | D: Route   | E: Stops   | F: Total KM
@@ -16,14 +16,30 @@
  * 7. Ensure "Execute as": "Me" and "Who has access": "Anyone".
  * 8. Click "Deploy".
  *
- * OPTIONAL ONE-TIME CLEANUP:
- * To clean up past rows in Column D so they don't start with "74 Dalmatian Cres",
- * select "cleanExistingRoutesInSheet" from the toolbar dropdown and click "Run".
+ * ONE-CLICK RETROACTIVE ROUTE CLEANUP:
+ * To clean up Column D in all existing rows (e.g. converting addresses like
+ * "80 Sheppard Ave E" into "CEC Board Office -> Home"):
+ * 1. Select "cleanExistingRoutesInSheet" from the Apps Script toolbar dropdown.
+ * 2. Click "Run" (▶).
  * ==============================================================================
  */
 
 const SHEET_NAME = "Trips";
-const DEFAULT_HOME_LABEL = "74 Dalmatian";
+
+// Mapping of known GTA school / building addresses to clean friendly names
+const KNOWN_LOCATIONS = [
+  { name: "CEC Board Office", patterns: ["80 Sheppard", "CEC Board", "Sheppard Ave E"] },
+  { name: "Chaminade College", patterns: ["490 Queen", "Chaminade"] },
+  { name: "St. John Paul II", patterns: ["685 Military", "John Paul"] },
+  { name: "St. Columba", patterns: ["1054 Military", "Columba"] },
+  { name: "St. Mother Teresa", patterns: ["440 Sewell", "Mother Teresa"] },
+  { name: "Madonna CSS", patterns: ["20 Cresswell", "Madonna"] },
+  { name: "St. Basil-the-Great", patterns: ["20 Weston", "Basil"] },
+  { name: "Maria Goretti", patterns: ["21 Tabor", "Goretti"] },
+  { name: "St. Agatha", patterns: ["Agatha"] },
+  { name: "St. Nicholas", patterns: ["Nicholas"] },
+  { name: "Downtown Office", patterns: ["100 Queen", "City Hall"] }
+];
 
 /**
  * Handle GET requests: Return all logged trips from the Google Sheet
@@ -50,11 +66,11 @@ function doGet(e) {
     let idIdx = headers.findIndex(h => h.includes("trip id") || h === "id");
     let dateIdx = headers.findIndex(h => h === "date" || h.includes("trip date"));
     let notesIdx = headers.findIndex(h => h.includes("note") || h.includes("purpose"));
-    let routeIdx = headers.findIndex(h => h.includes("route") || h.includes("stop") && !h.includes("count"));
+    let routeIdx = headers.findIndex(h => h.includes("route") || (h.includes("stop") && !h.includes("count")));
     let stopsCountIdx = headers.findIndex(h => h === "stops" || h.includes("count"));
     let kmIdx = headers.findIndex(h => h.includes("km") || h.includes("distance") || h.includes("mileage"));
 
-    // Fallbacks matching your exact sheet structure (A: Trip ID, B: Date, C: Notes, D: Route, E: Stops, F: Total KM)
+    // Fallbacks matching your exact sheet: A: Trip ID, B: Date, C: Notes, D: Route, E: Stops, F: Total KM
     if (idIdx === -1) idIdx = 0;
     if (dateIdx === -1) dateIdx = 1;
     if (notesIdx === -1) notesIdx = 2;
@@ -135,11 +151,11 @@ function doPost(e) {
     const chosenDate = payload.date || new Date().toISOString().slice(0, 10);
     const timestamp = payload.timestamp || new Date().toISOString();
 
-    // Use human-readable route summary starting with first destination
-    const routeSummary = payload.routeSummary || buildRouteSummaryFromStops(stops);
+    // Use human-readable route summary with clean names starting with first destination
+    const routeSummary = cleanRouteString(payload.routeSummary || buildRouteSummaryFromStops(stops));
     const stopsCount = stops.length;
 
-    // Calculate total driving distance using Google Maps Directions API
+    // Calculate driving distance using Google Maps Directions API
     let totalMeters = 0;
     for (let i = 0; i < stops.length - 1; i++) {
       const origin = stops[i];
@@ -191,64 +207,103 @@ function doPost(e) {
 }
 
 /**
- * Builds clean route summary (e.g. "Madonna CSS → St. Agatha → Home")
- * omitting redundant starting home address so it starts with the first trip!
+ * Checks if a segment represents the home address
  */
-function buildRouteSummaryFromStops(stops) {
-  if (!stops || stops.length === 0) return "Trip";
-
-  const cleanStops = stops.map(s => {
-    const firstPart = String(s).split(",")[0].trim();
-    return firstPart.replace(/^Home\s*[-—:]*\s*/i, "").trim();
-  });
-
-  const isFirstHome = cleanStops[0].toLowerCase().includes("dalmatian") || cleanStops[0].toLowerCase() === "home";
-  const isLastHome = cleanStops[cleanStops.length - 1].toLowerCase().includes("dalmatian") || cleanStops[cleanStops.length - 1].toLowerCase() === "home";
-
-  const destinations = [];
-
-  // If started from Home, omit home at the start so route begins with the first destination!
-  const startIndex = isFirstHome ? 1 : 0;
-
-  for (let i = startIndex; i < cleanStops.length - (isLastHome ? 1 : 0); i++) {
-    destinations.push(cleanStops[i]);
-  }
-
-  if (isLastHome) {
-    destinations.push("Home");
-  }
-
-  return destinations.length > 0 ? destinations.join(" → ") : "Home Circuit";
+function isHomeSegment(segment) {
+  if (!segment) return false;
+  const s = String(segment).toLowerCase().trim();
+  return (
+    s.includes("dalmatian") ||
+    s.includes("m1c 4w7") ||
+    s.includes("m1c4w7") ||
+    s === "home" ||
+    s.startsWith("home ") ||
+    s.startsWith("home,") ||
+    s.startsWith("home -") ||
+    s.startsWith("home —") ||
+    (s.includes("scarborough") && !s.includes("military") && !s.includes("sewells") && !s.includes("tabor"))
+  );
 }
 
 /**
- * Helper to clean existing route strings in Column D:
- * Strips "74 Dalmatian Cres" from start, replaces trailing home with "Home"
+ * Resolves an address or text to its friendly destination name (e.g. "CEC Board Office")
+ */
+function resolveFriendlyName(segment) {
+  if (!segment) return "";
+  const trimmed = String(segment).trim();
+
+  // 1. Check known locations map
+  for (let i = 0; i < KNOWN_LOCATIONS.length; i++) {
+    const loc = KNOWN_LOCATIONS[i];
+    for (let j = 0; j < loc.patterns.length; j++) {
+      if (trimmed.toLowerCase().includes(loc.patterns[j].toLowerCase())) {
+        return loc.name;
+      }
+    }
+  }
+
+  // 2. Clean address: remove postal codes, province, country
+  let clean = trimmed.split(",")[0].trim();
+  clean = clean.replace(/,.*$/, "");
+  clean = clean.replace(/\b(ON|Ontario|Canada|M\d[A-Z]\s*\d[A-Z]\d)\b/gi, "").trim();
+
+  return clean || trimmed;
+}
+
+/**
+ * Robust route parser:
+ * 1. Splits route into waypoints.
+ * 2. Omits the redundant home address from the start so the route starts with the first trip of the day!
+ * 3. Resolves raw street addresses (like "80 Sheppard Ave E...") into friendly school names ("CEC Board Office").
+ * 4. Ends cleanly with "Home" if it was a roundtrip.
  */
 function cleanRouteString(rawRoute) {
-  if (!rawRoute) return "";
-  let route = String(rawRoute).trim();
+  if (!rawRoute) return "Trip";
 
-  // Strip leading Home / 74 Dalmatian
-  route = route.replace(/^Home\s*[-—:]*\s*/i, "");
-  route = route.replace(/^74\s*Dalmatian\s*(Cres|Crescent)?[^→\->,]*/i, "").trim();
-  route = route.replace(/^(\s*[-—→>]+\s*|\s*to\s*)/i, "").trim();
+  const rawSegments = String(rawRoute)
+    .split(/\s*[-—→>]+\s*|\s+to\s+/i)
+    .map(s => s.trim())
+    .filter(Boolean);
 
-  // Replace trailing 74 Dalmatian with "Home"
-  route = route.replace(/74\s*Dalmatian\s*(Cres|Crescent)?[^→\->,]*/i, "Home").trim();
-  route = route.replace(/Home\s*[-—:]*\s*74\s*Dalmatian[^→\->,]*/i, "Home").trim();
+  if (rawSegments.length === 0) return "Trip";
 
-  // Clean double arrows
-  route = route.replace(/\s*[-—→>]+\s*[-—→>]+\s*/g, " → ");
-  route = route.replace(/^[-—→>\s]+|[-—→>\s]+$/g, "").trim();
+  const destinationSegments = [];
 
-  return route || "Home Circuit";
+  for (let i = 0; i < rawSegments.length; i++) {
+    const seg = rawSegments[i];
+    const isFirst = (i === 0);
+    const isLast = (i === rawSegments.length - 1);
+
+    if (isHomeSegment(seg)) {
+      if (isLast && destinationSegments.length > 0) {
+        destinationSegments.push("Home");
+      }
+      // If it's a leading home address or intermediate home, omit it!
+      continue;
+    }
+
+    destinationSegments.push(resolveFriendlyName(seg));
+  }
+
+  if (destinationSegments.length === 0) {
+    return "Home Circuit";
+  }
+
+  return destinationSegments.join(" → ");
+}
+
+/**
+ * Builds clean route summary from stop addresses
+ */
+function buildRouteSummaryFromStops(stops) {
+  if (!stops || stops.length === 0) return "Trip";
+  return cleanRouteString(stops.join(" → "));
 }
 
 /**
  * ONE-CLICK UTILITY TO CLEAN EXISTING GOOGLE SHEET ROWS:
- * Run this function in Apps Script to instantly update Column D in all existing rows
- * so they don't start with "74 Dalmatian Cres" and instead show where you went!
+ * Select "cleanExistingRoutesInSheet" in Apps Script and click "Run".
+ * It will update Column D in all past rows in your Google Sheet to the clean format!
  */
 function cleanExistingRoutesInSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -257,7 +312,7 @@ function cleanExistingRoutesInSheet() {
   if (data.length <= 1) return;
 
   const headers = data[0].map(h => String(h || "").trim().toLowerCase());
-  let routeIdx = headers.findIndex(h => h.includes("route"));
+  let routeIdx = headers.findIndex(h => h.includes("route") || (h.includes("stop") && !h.includes("count")));
   if (routeIdx === -1) routeIdx = 3; // Column D
 
   let updatedCount = 0;
@@ -272,7 +327,7 @@ function cleanExistingRoutesInSheet() {
     }
   }
 
-  Logger.log("Cleaned " + updatedCount + " existing routes in Column D.");
+  Logger.log("Successfully cleaned " + updatedCount + " existing routes in Column D.");
 }
 
 /**

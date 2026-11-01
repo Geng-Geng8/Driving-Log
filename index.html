@@ -793,19 +793,68 @@
     // -------------------------------------------------------------
     // ROUTE SUMMARY & DISPLAY FORMATTING
     // -------------------------------------------------------------
+    const KNOWN_LOCATIONS = [
+      { name: "CEC Board Office", patterns: ["80 Sheppard", "CEC Board", "Sheppard Ave E"] },
+      { name: "Chaminade College", patterns: ["490 Queen", "Chaminade"] },
+      { name: "St. John Paul II", patterns: ["685 Military", "John Paul"] },
+      { name: "St. Columba", patterns: ["1054 Military", "Columba"] },
+      { name: "St. Mother Teresa", patterns: ["440 Sewell", "Mother Teresa"] },
+      { name: "Madonna CSS", patterns: ["20 Cresswell", "Madonna"] },
+      { name: "St. Basil-the-Great", patterns: ["20 Weston", "Basil"] },
+      { name: "Maria Goretti", patterns: ["21 Tabor", "Goretti"] },
+      { name: "St. Agatha", patterns: ["Agatha"] },
+      { name: "St. Nicholas", patterns: ["Nicholas"] },
+      { name: "Downtown Office", patterns: ["100 Queen", "City Hall"] }
+    ];
+
+    function isHomeSegment(segment) {
+      if (!segment) return false;
+      const s = String(segment).toLowerCase().trim();
+      return (
+        s.includes("dalmatian") ||
+        s.includes("m1c 4w7") ||
+        s.includes("m1c4w7") ||
+        s === "home" ||
+        s.startsWith("home ") ||
+        s.startsWith("home,") ||
+        s.startsWith("home -") ||
+        s.startsWith("home —") ||
+        (s.includes("scarborough") && !s.includes("military") && !s.includes("sewells") && !s.includes("tabor"))
+      );
+    }
+
+    function resolveFriendlyName(segment) {
+      if (!segment) return "";
+      const trimmed = String(segment).trim();
+
+      for (let i = 0; i < KNOWN_LOCATIONS.length; i++) {
+        const loc = KNOWN_LOCATIONS[i];
+        for (let j = 0; j < loc.patterns.length; j++) {
+          if (trimmed.toLowerCase().includes(loc.patterns[j].toLowerCase())) {
+            return loc.name;
+          }
+        }
+      }
+
+      let clean = trimmed.split(",")[0].trim();
+      clean = clean.replace(/,.*$/, "");
+      clean = clean.replace(/\b(ON|Ontario|Canada|M\d[A-Z]\s*\d[A-Z]\d)\b/gi, "").trim();
+
+      return clean || trimmed;
+    }
+
     function buildRouteSummary() {
       if (currentStops.length === 0) return "No stops";
 
       const stopNames = currentStops.map(s => {
-        let name = s.name.trim();
-        return name.replace(/^Home\s*[-—:]*\s*/i, "").trim();
+        return resolveFriendlyName(s.name || s.address);
       });
 
       const parts = [];
 
       // If started from custom location (not Home Base), show starting point
       if (currentOrigin) {
-        parts.push(currentOrigin.name || currentOrigin.address.split(",")[0].trim());
+        parts.push(currentOrigin.name || resolveFriendlyName(currentOrigin.address));
       }
 
       // Add all destinations (first trip of the day is parts[0]!)
@@ -822,22 +871,35 @@
 
     function cleanRouteForDisplay(routeStr) {
       if (!routeStr) return "Trip";
-      let route = String(routeStr).trim();
 
-      // Strip leading home address or "Home -"
-      route = route.replace(/^Home\s*[-—:]*\s*/i, "");
-      route = route.replace(/^74\s*Dalmatian\s*(Cres|Crescent)?[^→\->,]*/i, "").trim();
-      route = route.replace(/^(\s*[-—→>]+\s*|\s*to\s*)/i, "").trim();
+      const rawSegments = String(routeStr)
+        .split(/\s*[-—→>]+\s*|\s+to\s+/i)
+        .map(s => s.trim())
+        .filter(Boolean);
 
-      // Replace trailing home address with "Home"
-      route = route.replace(/74\s*Dalmatian\s*(Cres|Crescent)?[^→\->,]*/i, "Home").trim();
-      route = route.replace(/Home\s*[-—:]*\s*74\s*Dalmatian[^→\->,]*/i, "Home").trim();
+      if (rawSegments.length === 0) return "Trip";
 
-      // Clean double arrows
-      route = route.replace(/\s*[-—→>]+\s*[-—→>]+\s*/g, " → ");
-      route = route.replace(/^[-—→>\s]+|[-—→>\s]+$/g, "").trim();
+      const destinationSegments = [];
 
-      return route || "Home Circuit";
+      for (let i = 0; i < rawSegments.length; i++) {
+        const seg = rawSegments[i];
+        const isLast = (i === rawSegments.length - 1);
+
+        if (isHomeSegment(seg)) {
+          if (isLast && destinationSegments.length > 0) {
+            destinationSegments.push("Home");
+          }
+          continue;
+        }
+
+        destinationSegments.push(resolveFriendlyName(seg));
+      }
+
+      if (destinationSegments.length === 0) {
+        return "Home Circuit";
+      }
+
+      return destinationSegments.join(" → ");
     }
 
     function renderRouteHtml(routeStr) {
