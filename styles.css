@@ -110,12 +110,13 @@ html, body {
   user-select: none;
 }
 
-.segmented-btn:hover:not(.is-active) {
+.segmented-btn:hover:not(.is-active):not(.active) {
   color: #e2e8f0;
   background: rgba(255, 255, 255, 0.03);
 }
 
-.segmented-btn.is-active {
+.segmented-btn.is-active,
+.segmented-btn.active {
   background: rgba(255, 255, 255, 0.09);
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.14);

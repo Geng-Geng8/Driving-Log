@@ -333,12 +333,13 @@
       user-select: none;
     }
 
-    .segmented-btn:hover:not(.is-active) {
+    .segmented-btn:hover:not(.is-active):not(.active) {
       color: #e2e8f0;
       background: rgba(255, 255, 255, 0.03);
     }
 
-    .segmented-btn.is-active {
+    .segmented-btn.is-active,
+    .segmented-btn.active {
       background: rgba(255, 255, 255, 0.09);
       color: #ffffff;
       border-color: rgba(255, 255, 255, 0.14);
@@ -438,21 +439,21 @@
       <div class="segmented-control" role="tablist" aria-label="App Navigation">
         <button
           type="button"
-          id="navLogTripBtn"
+          id="btnLogTripView"
           role="tab"
           aria-selected="true"
-          onclick="switchAppView('log')"
-          class="segmented-btn is-active"
+          onclick="switchAppView('logTrip')"
+          class="segmented-btn is-active active"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           <span>Log Trip</span>
         </button>
         <button
           type="button"
-          id="navTaxReportsBtn"
+          id="btnTaxReportsView"
           role="tab"
           aria-selected="false"
-          onclick="switchAppView('reports')"
+          onclick="switchAppView('taxReports')"
           class="segmented-btn"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -956,6 +957,7 @@
       setupOriginInputListener();
       setTripDateToToday();
       populateAppsScriptCodeBlock();
+      setupViewSwitcher();
 
       // Mirror live sheet data in background
       syncWithGoogleSheet(false);
@@ -1512,6 +1514,7 @@
         if (data.status === "success" && Array.isArray(data.trips)) {
           // Google Sheet is the single source of truth! Cache locally on this device
           localStorage.setItem("driving_log_history", JSON.stringify(data.trips.slice(0, 500)));
+          localStorage.setItem("driving_log_recent_trips", JSON.stringify(data.trips.slice(0, 500)));
           if (data.sheetUrl && typeof data.sheetUrl === "string") {
             localStorage.setItem("driving_log_sheet_url", data.sheetUrl);
             const sheetInput = document.getElementById("configSheetUrlInput");
@@ -1856,21 +1859,39 @@
     // LOCAL LOGS & UI HELPERS
     // -------------------------------------------------------------
     function saveToRecentHistory(entry) {
-      const history = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
+      let history = [];
+      try {
+        const raw = localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
+        history = JSON.parse(raw);
+        if (!Array.isArray(history)) history = [];
+      } catch (e) {
+        history = [];
+      }
       history.unshift(entry);
-      localStorage.setItem("driving_log_history", JSON.stringify(history.slice(0, 500)));
+      const trimmed = history.slice(0, 500);
+      localStorage.setItem("driving_log_recent_trips", JSON.stringify(trimmed));
+      localStorage.setItem("driving_log_history", JSON.stringify(trimmed));
       renderRecentDrives();
       renderTaxDashboard();
     }
 
     function renderRecentDrives(trips = null, totalKmOverride = null) {
-      const history = trips || JSON.parse(localStorage.getItem("driving_log_history") || "[]");
+      let history = trips;
+      if (!history) {
+        try {
+          const raw = localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
+          history = JSON.parse(raw);
+          if (!Array.isArray(history)) history = [];
+        } catch (e) {
+          history = [];
+        }
+      }
       const feed = document.getElementById("recentDrivesFeed");
       const totalDisplay = document.getElementById("sessionTotalKm");
 
       const totalKm = totalKmOverride !== null 
         ? totalKmOverride 
-        : history.reduce((acc, h) => acc + (Number(h.km) || 0), 0);
+        : history.reduce((acc, h) => acc + (Number(h && h.km) || 0), 0);
 
       totalDisplay.innerText = `${totalKm.toFixed(1)} KM Logged`;
 
@@ -1925,39 +1946,81 @@
       { id: "other", label: "Other", match: [] }
     ];
 
-    function switchAppView(view) {
-      currentAppView = view === "tax" ? "tax" : "log";
+    function switchAppView(viewName) {
+      const v = String(viewName || "").toLowerCase();
+      const isTax = v === "taxreports" || v === "tax" || v === "reports" || v === "tax_reports";
+      currentAppView = isTax ? "taxReports" : "logTrip";
+
       const logView = document.getElementById("logTripView");
       const taxView = document.getElementById("taxReportsView");
       const footer = document.getElementById("bottomDockFooter");
-      const navLogBtn = document.getElementById("navLogTripBtn");
-      const navTaxBtn = document.getElementById("navTaxReportsBtn");
+      const btnLog = document.getElementById("btnLogTripView") || document.getElementById("navLogTripBtn");
+      const btnTax = document.getElementById("btnTaxReportsView") || document.getElementById("navTaxReportsBtn");
 
-      if (currentAppView === "tax") {
-        if (logView) logView.classList.add("hidden");
-        if (taxView) taxView.classList.remove("hidden");
-        if (footer) footer.classList.add("hidden");
-        if (navLogBtn) {
-          navLogBtn.classList.remove("is-active");
-          navLogBtn.setAttribute("aria-selected", "false");
+      if (isTax) {
+        if (logView) {
+          logView.classList.add("hidden");
+          logView.style.display = "none";
         }
-        if (navTaxBtn) {
-          navTaxBtn.classList.add("is-active");
-          navTaxBtn.setAttribute("aria-selected", "true");
+        if (taxView) {
+          taxView.classList.remove("hidden");
+          taxView.style.display = "block";
+        }
+        if (footer) {
+          footer.classList.add("hidden");
+          footer.style.display = "none";
+        }
+        if (btnLog) {
+          btnLog.classList.remove("is-active", "active");
+          btnLog.setAttribute("aria-selected", "false");
+        }
+        if (btnTax) {
+          btnTax.classList.add("is-active", "active");
+          btnTax.setAttribute("aria-selected", "true");
         }
         renderTaxDashboard();
       } else {
-        if (taxView) taxView.classList.add("hidden");
-        if (logView) logView.classList.remove("hidden");
-        if (footer) footer.classList.remove("hidden");
-        if (navTaxBtn) {
-          navTaxBtn.classList.remove("is-active");
-          navTaxBtn.setAttribute("aria-selected", "false");
+        if (taxView) {
+          taxView.classList.add("hidden");
+          taxView.style.display = "none";
         }
-        if (navLogBtn) {
-          navLogBtn.classList.add("is-active");
-          navLogBtn.setAttribute("aria-selected", "true");
+        if (logView) {
+          logView.classList.remove("hidden");
+          logView.style.display = "block";
         }
+        if (footer) {
+          footer.classList.remove("hidden");
+          footer.style.display = "";
+        }
+        if (btnTax) {
+          btnTax.classList.remove("is-active", "active");
+          btnTax.setAttribute("aria-selected", "false");
+        }
+        if (btnLog) {
+          btnLog.classList.add("is-active", "active");
+          btnLog.setAttribute("aria-selected", "true");
+        }
+      }
+    }
+
+    // Expose switchAppView globally
+    window.switchAppView = switchAppView;
+
+    function setupViewSwitcher() {
+      const btnLog = document.getElementById("btnLogTripView") || document.getElementById("navLogTripBtn");
+      const btnTax = document.getElementById("btnTaxReportsView") || document.getElementById("navTaxReportsBtn");
+
+      if (btnLog) {
+        btnLog.addEventListener("click", (e) => {
+          e.preventDefault();
+          switchAppView("logTrip");
+        });
+      }
+      if (btnTax) {
+        btnTax.addEventListener("click", (e) => {
+          e.preventDefault();
+          switchAppView("taxReports");
+        });
       }
     }
 
@@ -1973,6 +2036,7 @@
       }
       renderTaxDashboard();
     }
+    window.setTaxDateFilter = setTaxDateFilter;
 
     function loadOdometerBaseline() {
       const startVal = localStorage.getItem("driving_log_odom_start") || "";
@@ -2006,6 +2070,7 @@
       updateOdometerDeltaDisplay();
       renderTaxDashboard();
     }
+    window.handleOdometerInput = handleOdometerInput;
 
     function getOdometerVehicleKm() {
       const startRaw = localStorage.getItem("driving_log_odom_start");
@@ -2036,6 +2101,7 @@
     }
 
     function getTripDateStr(trip) {
+      if (!trip) return "";
       if (trip.date && /^\d{4}-\d{2}-\d{2}/.test(String(trip.date))) {
         return String(trip.date).slice(0, 10);
       }
@@ -2046,6 +2112,8 @@
     }
 
     function filterTripsByPeriod(trips, filterKey) {
+      if (!Array.isArray(trips)) return [];
+
       const now = new Date();
       const todayYear = now.getFullYear();
       const todayMonth = String(now.getMonth() + 1).padStart(2, "0");
@@ -2079,6 +2147,7 @@
       }
 
       return trips.filter(trip => {
+        if (!trip) return false;
         const dStr = getTripDateStr(trip);
         if (filterKey === "all_time") return true;
         if (!dStr) return false;
@@ -2110,11 +2179,22 @@
     }
 
     function renderTaxDashboard() {
-      const allTrips = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
-      const filteredTrips = filterTripsByPeriod(allTrips, currentTaxFilter);
+      let allTrips = [];
+      try {
+        const raw = localStorage.getItem("driving_log_recent_trips") || 
+                    localStorage.getItem("driving_log_history") || 
+                    "[]";
+        allTrips = JSON.parse(raw);
+        if (!Array.isArray(allTrips)) allTrips = [];
+      } catch (err) {
+        console.warn("Error reading trips from localStorage:", err);
+        allTrips = [];
+      }
+
+      const filteredTrips = Array.isArray(allTrips) ? filterTripsByPeriod(allTrips, currentTaxFilter) : [];
 
       // 1. Business KM Logged
-      const businessKm = filteredTrips.reduce((sum, t) => sum + (Number(t.km) || 0), 0);
+      const businessKm = (Array.isArray(filteredTrips) ? filteredTrips : []).reduce((sum, t) => sum + (Number(t && t.km) || 0), 0);
       const kpiBusinessEl = document.getElementById("kpiBusinessKm");
       const kpiBusinessSubEl = document.getElementById("kpiBusinessSubtext");
       if (kpiBusinessEl) kpiBusinessEl.innerText = `${businessKm.toFixed(1)} km`;
@@ -2156,6 +2236,7 @@
       });
 
       filteredTrips.forEach(t => {
+        if (!t) return;
         const catLabel = classifyTripPurpose(t.notes);
         const km = Number(t.km) || 0;
         purposeTotals[catLabel] = (purposeTotals[catLabel] || 0) + km;
@@ -2211,6 +2292,7 @@
           `;
         } else {
           auditListEl.innerHTML = filteredTrips.map(t => {
+            if (!t) return "";
             const dStr = getTripDateStr(t) || "—";
             const rawRoute = t.stops || t.route || t.notes || "Trip";
             const cleanedRoute = cleanRouteForDisplay(rawRoute);
@@ -2257,6 +2339,7 @@
         window.open(cleanUrl, "_blank", "noopener,noreferrer");
       }
     }
+    window.openLiveGoogleSheet = openLiveGoogleSheet;
 
     function showAlert(msg, type = "info") {
       const banner = document.getElementById("alertBanner");
