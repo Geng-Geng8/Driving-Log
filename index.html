@@ -6,7 +6,7 @@
   <title>Trip Log | Circuit Mileage</title>
 
   <!-- PWA & Mobile Web App Meta -->
-  <meta name="theme-color" content="#10b981">
+  <meta name="theme-color" content="#020617">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,9 +14,9 @@
   <meta name="application-name" content="TripLog">
 
   <!-- Manifest & Favicons -->
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="icon-512.png">
-  <link rel="apple-touch-icon" href="icon-512.png">
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="manifest" href="manifest.json" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -65,9 +65,7 @@
   <header class="sticky top-0 z-40 bg-surface-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5">
     <div class="max-w-md mx-auto flex items-center justify-between">
       <div class="flex items-center space-x-2.5">
-        <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-        </div>
+        <img src="icon.png" alt="Driving Log Logo" class="w-9 h-9 object-contain rounded-xl" />
         <div>
           <div class="flex items-center gap-1.5">
             <h1 class="text-sm font-semibold tracking-tight text-white leading-tight">Trip Log</h1>
