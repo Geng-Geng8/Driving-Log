@@ -159,6 +159,23 @@
       </div>
     </div>
 
+    <!-- Trip Date -->
+    <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 shadow-sm">
+      <div class="flex items-center justify-between">
+        <label for="tripDateInput" class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          Trip Date
+        </label>
+        <button type="button" onclick="setTripDateToToday()" class="text-[10px] text-brand-500 hover:text-brand-400 font-medium transition">Today</button>
+      </div>
+      <input 
+        type="date" 
+        id="tripDateInput" 
+        style="color-scheme: dark;"
+        class="w-full bg-surface-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition"
+      >
+    </div>
+
     <!-- Purpose & Quick Notes -->
     <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 shadow-sm">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Trip Purpose & Notes</div>
@@ -265,6 +282,7 @@
       renderRecentDrives();
       updateOfflineQueueBadge();
       setupSearchListener();
+      setTripDateToToday();
 
       window.addEventListener("online", () => {
         updateConnectionStatus(true);
@@ -272,6 +290,21 @@
       });
       window.addEventListener("offline", () => updateConnectionStatus(false));
     });
+
+    function getTodayDateString() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function setTripDateToToday() {
+      const dateInput = document.getElementById("tripDateInput");
+      if (dateInput) {
+        dateInput.value = getTodayDateString();
+      }
+    }
 
     function loadSettings() {
       const home = localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
@@ -471,6 +504,7 @@
       const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
       const isReturn = document.getElementById("returnHomeToggle").checked;
       const note = document.getElementById("tripNoteInput").value.trim() || "School Visit Circuit";
+      const selectedDate = document.getElementById("tripDateInput").value || getTodayDateString();
 
       if (currentStops.length === 0) {
         showAlert("Add at least 1 destination stop before recording.", "warning");
@@ -483,10 +517,22 @@
 
       setSubmittingState(true);
 
+      // Preserve the chosen trip date in local time for timestamp calculation
+      const now = new Date();
+      let tripTimestamp;
+      if (selectedDate) {
+        const [y, m, d] = selectedDate.split("-").map(Number);
+        const tripDate = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+        tripTimestamp = tripDate.toISOString();
+      } else {
+        tripTimestamp = now.toISOString();
+      }
+
       const payload = {
         stops: routeAddresses,
         notes: note,
-        timestamp: new Date().toISOString()
+        date: selectedDate,
+        timestamp: tripTimestamp
       };
 
       try {
@@ -501,7 +547,7 @@
         if (data.success) {
           saveToRecentHistory({
             tripId: data.tripId || "SYNCED",
-            date: new Date().toLocaleDateString("en-CA"),
+            date: selectedDate,
             km: data.totalKm,
             stops: currentStops.map(s => s.name).join(" → "),
             synced: true
@@ -517,7 +563,7 @@
         enqueueOfflineTrip(payload);
         saveToRecentHistory({
           tripId: "OFFLINE",
-          date: new Date().toLocaleDateString("en-CA"),
+          date: selectedDate,
           km: 0,
           stops: currentStops.map(s => s.name).join(" → "),
           synced: false
@@ -532,6 +578,7 @@
     function resetTripForm() {
       currentStops = [];
       document.getElementById("tripNoteInput").value = "";
+      setTripDateToToday();
       renderStops();
     }
 
