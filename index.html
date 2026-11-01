@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Driving Log | Circuit Mileage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#ecfdf5', 500: '#10b981', 600: '#059669', 700: '#047857' },
+            surface: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-surface-950 text-slate-100 min-h-screen pb-32 font-sans antialiased selection:bg-brand-500/30">
+
+  <!-- Header & Status Bar -->
+  <header class="sticky top-0 z-40 bg-surface-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-semibold tracking-tight text-white leading-tight">Trip Log</h1>
+          <p id="connectionStatus" class="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Sheets Live
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button id="offlineQueueBadge" onclick="flushOfflineQueue()" class="hidden text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+          <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+          <span id="queueCount">0</span> Pending
+        </button>
+        <button onclick="toggleSettingsModal(true)" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 pt-4 space-y-4">
+
+    <!-- Notification Banner -->
+    <div id="alertBanner" class="hidden rounded-xl p-3 border text-xs flex items-start justify-between transition-all">
+      <div class="flex items-center gap-2">
+        <span id="alertIcon"></span>
+        <span id="alertMessage" class="font-medium"></span>
+      </div>
+      <button onclick="dismissAlert()" class="text-slate-400 hover:text-white ml-2">✕</button>
+    </div>
+
+    <!-- Frequent GTA Schools Quick Add -->
+    <section class="space-y-2">
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <span class="font-medium flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
+          Frequent Schools (GTA)
+        </span>
+        <button onclick="resetDefaultSchools()" class="text-[11px] text-slate-500 hover:text-slate-400">Reset</button>
+      </div>
+      <div id="frequentChips" class="flex gap-1.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Address & School Autocomplete Search -->
+    <div class="relative">
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+        <input 
+          type="text" 
+          id="addressSearchInput"
+          placeholder="Search school or address in Toronto..." 
+          class="w-full bg-surface-900 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition"
+          autocomplete="off"
+        >
+        <button 
+          id="clearSearchBtn" 
+          onclick="clearSearch()" 
+          class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Autocomplete Dropdown Menu -->
+      <div 
+        id="autocompleteResults" 
+        class="hidden absolute left-0 right-0 top-full mt-1.5 bg-surface-900/95 backdrop-blur-xl border border-slate-800 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-800/60"
+      >
+        <!-- Populated via search -->
+      </div>
+    </div>
+
+    <!-- Circuit Stops List Card -->
+    <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-4 space-y-3.5 shadow-sm">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800/60">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Circuit Route</span>
+        <span id="stopsCountBadge" class="text-[11px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-300 font-medium">2 Points</span>
+      </div>
+
+      <!-- Origin: Scarborough Home Base -->
+      <div class="flex items-center gap-3 bg-surface-950/60 border border-slate-800/60 rounded-xl p-3">
+        <div class="w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-brand-500/20"></div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[10px] font-semibold tracking-wider uppercase text-brand-500">Origin (Start)</div>
+          <div id="originDisplay" class="text-xs font-medium text-white truncate">Home — 74 Dalmatian Cres, Scarborough</div>
+        </div>
+        <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Default</span>
+      </div>
+
+      <!-- Intermediate Stops Container -->
+      <div id="stopsContainer" class="space-y-2">
+        <!-- Injected dynamically -->
+      </div>
+
+      <!-- Return to Home Switch -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800/60">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <div>
+            <div class="text-xs font-medium text-white">Return to Home</div>
+            <div class="text-[10px] text-slate-400">Adds return leg back to Scarborough</div>
+          </div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="returnHomeToggle" class="sr-only peer" checked onchange="handleReturnToggle()">
+          <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-500"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Purpose & Quick Notes -->
+    <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Trip Purpose & Notes</div>
+      <div class="flex flex-wrap gap-1.5">
+        <button type="button" onclick="appendNote('SHSM Workshop')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 transition">+ SHSM Workshop</button>
+        <button type="button" onclick="appendNote('Cypher Program')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 transition">+ Cypher Program</button>
+        <button type="button" onclick="appendNote('School Board Meeting')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 transition">+ Board Meeting</button>
+        <button type="button" onclick="appendNote('Site Visit')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 transition">+ Site Visit</button>
+      </div>
+
+      <input 
+        type="text" 
+        id="tripNoteInput" 
+        placeholder="e.g. Student workshop delivery & mentor review" 
+        class="w-full bg-surface-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+      >
+    </div>
+
+    <!-- Recent Drives History Feed -->
+    <div class="space-y-2 pt-2">
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <span class="font-medium">Recent Logged Drives</span>
+        <span id="sessionTotalKm" class="text-brand-500 font-semibold">0.0 KM Logged</span>
+      </div>
+      <div id="recentDrivesFeed" class="space-y-2">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Sticky Bottom Submission Bar -->
+  <footer class="fixed bottom-0 inset-x-0 bg-surface-950/95 backdrop-blur-lg border-t border-slate-800 p-4 z-40">
+    <div class="max-w-md mx-auto">
+      <button 
+        id="submitDriveBtn" 
+        onclick="recordAndSyncDrive()" 
+        class="w-full bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-surface-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:pointer-events-none"
+      >
+        <span id="btnIcon">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <span id="btnText" class="text-sm tracking-wide">Record Circuit & Save to Sheet</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <h3 class="text-sm font-semibold text-white">App Configuration</h3>
+        <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-400 mb-1">Home Address (Origin & Return)</label>
+          <input type="text" id="configHomeInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white">
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">Google Apps Script Endpoint</label>
+          <input type="text" id="configScriptUrlInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white text-[11px] font-mono">
+        </div>
+      </div>
+      <div class="pt-2 flex justify-end gap-2">
+        <button onclick="toggleSettingsModal(false)" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white">Cancel</button>
+        <button onclick="saveConfiguration()" class="px-4 py-1.5 text-xs bg-brand-500 font-semibold text-surface-950 rounded-lg">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // CONFIGURATION DEFAULTS
+    // -------------------------------------------------------------
+    const DEFAULT_CONFIG = {
+      homeAddress: "74 Dalmatian Cres, Scarborough, ON M1C 4W7",
+      scriptUrl: "https://script.google.com/macros/s/AKfycbxy329TvoYfPmQ9h5sY-Rr-TZQ_P8Fje70ssWQ9p5pBCeQCoV6KmGfZaCQWjGk6dPPQ/exec"
+    };
+
+    const PRESET_SCHOOLS = [
+      { name: "Chaminade College", address: "Chaminade College School, 490 Queen's Dr, North York, ON" },
+      { name: "CEC Board Office", address: "80 Sheppard Ave E, North York, ON M2N 6E8" },
+      { name: "St. John Paul II", address: "St. John Paul II CSS, 685 Military Trail, Scarborough, ON" },
+      { name: "St. Columba", address: "St. Columba Catholic School, 1054 Military Trail, Scarborough, ON" },
+      { name: "St. Mother Teresa", address: "St. Mother Teresa CA, 440 Sewells Rd, Scarborough, ON" },
+      { name: "Madonna CSS", address: "Madonna Catholic Secondary School, 20 Cresswell Ave, North York, ON" },
+      { name: "St. Basil-the-Great", address: "St. Basil-the-Great College, 20 Weston Rd, North York, ON" },
+      { name: "Maria Goretti", address: "Maria Goretti Catholic School, 21 Tabor Rd, Scarborough, ON" }
+    ];
+
+    let currentStops = [];
+    let isSubmitting = false;
+    let searchDebounceTimer = null;
+
+    // -------------------------------------------------------------
+    // INITIALIZATION
+    // -------------------------------------------------------------
+    document.addEventListener("DOMContentLoaded", () => {
+      loadSettings();
+      renderFrequentChips();
+      renderStops();
+      renderRecentDrives();
+      updateOfflineQueueBadge();
+      setupSearchListener();
+
+      window.addEventListener("online", () => {
+        updateConnectionStatus(true);
+        flushOfflineQueue();
+      });
+      window.addEventListener("offline", () => updateConnectionStatus(false));
+    });
+
+    function loadSettings() {
+      const home = localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
+      const url = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+      document.getElementById("originDisplay").innerText = `Home — ${home}`;
+      document.getElementById("configHomeInput").value = home;
+      document.getElementById("configScriptUrlInput").value = url;
+    }
+
+    function saveConfiguration() {
+      const home = document.getElementById("configHomeInput").value.trim();
+      const url = document.getElementById("configScriptUrlInput").value.trim();
+      if (home) localStorage.setItem("driving_log_home", home);
+      if (url) localStorage.setItem("driving_log_script_url", url);
+      loadSettings();
+      toggleSettingsModal(false);
+      showAlert("Settings saved.", "success");
+    }
+
+    // -------------------------------------------------------------
+    // FREQUENT SCHOOLS BAR
+    // -------------------------------------------------------------
+    function renderFrequentChips() {
+      const container = document.getElementById("frequentChips");
+      container.innerHTML = PRESET_SCHOOLS.map(school => `
+        <button 
+          type="button"
+          onclick="addStop('${school.name.replace(/'/g, "\\'")}', '${school.address.replace(/'/g, "\\'")}')" 
+          class="shrink-0 bg-surface-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition active:scale-95"
+        >
+          <span class="text-brand-500 font-bold">+</span> ${school.name}
+        </button>
+      `).join("");
+    }
+
+    function resetDefaultSchools() {
+      renderFrequentChips();
+      showAlert("Frequent schools reset.", "info");
+    }
+
+    // -------------------------------------------------------------
+    // TORONTO-BIASED SEARCH AUTOCOMPLETE
+    // -------------------------------------------------------------
+    function setupSearchListener() {
+      const input = document.getElementById("addressSearchInput");
+      const clearBtn = document.getElementById("clearSearchBtn");
+
+      input.addEventListener("input", (e) => {
+        const query = e.target.value.trim();
+        clearBtn.classList.toggle("hidden", query.length === 0);
+
+        clearTimeout(searchDebounceTimer);
+        if (query.length < 2) {
+          hideAutocomplete();
+          return;
+        }
+
+        searchDebounceTimer = setTimeout(() => executeTorontoSearch(query), 200);
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest("#addressSearchInput") && !e.target.closest("#autocompleteResults")) {
+          hideAutocomplete();
+        }
+      });
+    }
+
+    async function executeTorontoSearch(query) {
+      const resultsContainer = document.getElementById("autocompleteResults");
+      const normalizedQuery = query.toLowerCase();
+
+      // 1. Check local preset schools first
+      const localMatches = PRESET_SCHOOLS.filter(s => 
+        s.name.toLowerCase().includes(normalizedQuery) || s.address.toLowerCase().includes(normalizedQuery)
+      );
+
+      // 2. Fetch live suggestions biased to Toronto coordinates (lat: 43.6532, lon: -79.3832)
+      let externalResults = [];
+      try {
+        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=43.6532&lon=-79.3832&limit=5`);
+        if (res.ok) {
+          const data = await res.json();
+          externalResults = (data.features || []).map(f => {
+            const p = f.properties;
+            const street = [p.housenumber, p.street].filter(Boolean).join(" ");
+            const city = p.city || p.district || "Toronto";
+            const label = p.name || street;
+            const fullAddress = [label, street !== label ? street : null, city, p.state || "ON"].filter(Boolean).join(", ");
+            return { name: label, address: fullAddress };
+          });
+        }
+      } catch (err) {
+        console.warn("Geocoder fallback to local query:", err);
+      }
+
+      const combined = [...localMatches, ...externalResults].slice(0, 6);
+
+      if (combined.length === 0) {
+        resultsContainer.innerHTML = `
+          <div onclick="addStop('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" class="p-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between">
+            <div>
+              <div class="font-medium text-white">${query}</div>
+              <div class="text-[11px] text-slate-400">Add with default Toronto, ON bias</div>
+            </div>
+            <span class="text-brand-500 font-bold">+</span>
+          </div>
+        `;
+      } else {
+        resultsContainer.innerHTML = combined.map(item => `
+          <div onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" class="p-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between">
+            <div class="min-w-0 pr-2">
+              <div class="font-medium text-white truncate">${item.name}</div>
+              <div class="text-[11px] text-slate-400 truncate">${item.address}</div>
+            </div>
+            <span class="text-brand-500 font-bold shrink-0">+</span>
+          </div>
+        `).join("");
+      }
+
+      resultsContainer.classList.remove("hidden");
+    }
+
+    function hideAutocomplete() {
+      document.getElementById("autocompleteResults").classList.add("hidden");
+    }
+
+    function clearSearch() {
+      const input = document.getElementById("addressSearchInput");
+      input.value = "";
+      document.getElementById("clearSearchBtn").classList.add("hidden");
+      hideAutocomplete();
+      input.focus();
+    }
+
+    // -------------------------------------------------------------
+    // STOPS LIST LOGIC
+    // -------------------------------------------------------------
+    function addStop(name, address) {
+      currentStops.push({ id: Math.random().toString(36).substr(2, 9), name, address });
+      clearSearch();
+      renderStops();
+    }
+
+    function removeStop(index) {
+      currentStops.splice(index, 1);
+      renderStops();
+    }
+
+    function renderStops() {
+      const container = document.getElementById("stopsContainer");
+      const badge = document.getElementById("stopsCountBadge");
+      const isReturn = document.getElementById("returnHomeToggle").checked;
+      const totalPoints = currentStops.length + (isReturn ? 2 : 1);
+      badge.innerText = `${totalPoints} Point${totalPoints !== 1 ? 's' : ''}`;
+
+      if (currentStops.length === 0) {
+        container.innerHTML = `
+          <div class="border border-dashed border-slate-800 rounded-xl p-3 text-center">
+            <p class="text-xs text-slate-500">Tap a frequent school chip or search an address above</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = currentStops.map((stop, i) => `
+        <div class="flex items-center gap-3 bg-surface-950 border border-slate-800/80 rounded-xl p-3">
+          <div class="w-5 h-5 rounded-full bg-slate-800 text-brand-500 text-[11px] font-bold flex items-center justify-center shrink-0">
+            ${i + 1}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium text-white truncate">${stop.name}</div>
+            <div class="text-[10px] text-slate-400 truncate">${stop.address}</div>
+          </div>
+          <button onclick="removeStop(${i})" class="text-slate-500 hover:text-rose-400 p-1 rounded transition">✕</button>
+        </div>
+      `).join("");
+    }
+
+    function handleReturnToggle() {
+      renderStops();
+    }
+
+    function appendNote(tag) {
+      const input = document.getElementById("tripNoteInput");
+      input.value = input.value ? `${input.value} • ${tag}` : tag;
+    }
+
+    // -------------------------------------------------------------
+    // RECORD & DISPATCH TO GOOGLE SHEETS
+    // -------------------------------------------------------------
+    async function recordAndSyncDrive() {
+      if (isSubmitting) return;
+
+      const home = localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
+      const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+      const isReturn = document.getElementById("returnHomeToggle").checked;
+      const note = document.getElementById("tripNoteInput").value.trim() || "School Visit Circuit";
+
+      if (currentStops.length === 0) {
+        showAlert("Add at least 1 destination stop before recording.", "warning");
+        return;
+      }
+
+      const routeAddresses = [home];
+      currentStops.forEach(s => routeAddresses.push(s.address));
+      if (isReturn) routeAddresses.push(home);
+
+      setSubmittingState(true);
+
+      const payload = {
+        stops: routeAddresses,
+        notes: note,
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          saveToRecentHistory({
+            tripId: data.tripId || "SYNCED",
+            date: new Date().toLocaleDateString("en-CA"),
+            km: data.totalKm,
+            stops: currentStops.map(s => s.name).join(" → "),
+            synced: true
+          });
+          showAlert(`✓ Logged ${data.totalKm} KM to Google Sheets! (${data.tripId || 'Saved'})`, "success");
+          resetTripForm();
+        } else {
+          throw new Error(data.error || "Server rejected route calculation.");
+        }
+
+      } catch (err) {
+        console.warn("Sync dropped, saving to offline queue:", err);
+        enqueueOfflineTrip(payload);
+        saveToRecentHistory({
+          tripId: "OFFLINE",
+          date: new Date().toLocaleDateString("en-CA"),
+          km: 0,
+          stops: currentStops.map(s => s.name).join(" → "),
+          synced: false
+        });
+        showAlert("Offline: Drive saved locally. Will sync to Sheets when connection resumes.", "warning");
+        resetTripForm();
+      } finally {
+        setSubmittingState(false);
+      }
+    }
+
+    function resetTripForm() {
+      currentStops = [];
+      document.getElementById("tripNoteInput").value = "";
+      renderStops();
+    }
+
+    function setSubmittingState(active) {
+      isSubmitting = active;
+      const btn = document.getElementById("submitDriveBtn");
+      const btnText = document.getElementById("btnText");
+      const btnIcon = document.getElementById("btnIcon");
+
+      btn.disabled = active;
+      if (active) {
+        btnText.innerText = "Calculating & Logging Route...";
+        btnIcon.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
+      } else {
+        btnText.innerText = "Record Circuit & Save to Sheet";
+        btnIcon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // OFFLINE QUEUE RESILIENCE
+    // -------------------------------------------------------------
+    function enqueueOfflineTrip(payload) {
+      const queue = JSON.parse(localStorage.getItem("driving_log_queue") || "[]");
+      queue.push(payload);
+      localStorage.setItem("driving_log_queue", JSON.stringify(queue));
+      updateOfflineQueueBadge();
+    }
+
+    async function flushOfflineQueue() {
+      const queue = JSON.parse(localStorage.getItem("driving_log_queue") || "[]");
+      if (queue.length === 0) return;
+
+      const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+      const remaining = [];
+
+      for (const item of queue) {
+        try {
+          const res = await fetch(scriptUrl, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(item)
+          });
+          const data = await res.json();
+          if (!data.success) remaining.push(item);
+        } catch (e) {
+          remaining.push(item);
+        }
+      }
+
+      localStorage.setItem("driving_log_queue", JSON.stringify(remaining));
+      updateOfflineQueueBadge();
+
+      if (remaining.length === 0) {
+        showAlert("All offline drives synced to Google Sheets!", "success");
+      }
+    }
+
+    function updateOfflineQueueBadge() {
+      const queue = JSON.parse(localStorage.getItem("driving_log_queue") || "[]");
+      const badge = document.getElementById("offlineQueueBadge");
+      const count = document.getElementById("queueCount");
+
+      if (queue.length > 0) {
+        count.innerText = queue.length;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // LOCAL LOGS & UI HELPERS
+    // -------------------------------------------------------------
+    function saveToRecentHistory(entry) {
+      const history = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
+      history.unshift(entry);
+      localStorage.setItem("driving_log_history", JSON.stringify(history.slice(0, 10)));
+      renderRecentDrives();
+    }
+
+    function renderRecentDrives() {
+      const history = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
+      const feed = document.getElementById("recentDrivesFeed");
+      const totalDisplay = document.getElementById("sessionTotalKm");
+
+      const totalKm = history.reduce((acc, h) => acc + (Number(h.km) || 0), 0);
+      totalDisplay.innerText = `${totalKm.toFixed(1)} KM Logged`;
+
+      if (history.length === 0) {
+        feed.innerHTML = `<div class="text-[11px] text-slate-500 py-2">No drives logged yet today.</div>`;
+        return;
+      }
+
+      feed.innerHTML = history.slice(0, 4).map(h => `
+        <div class="bg-surface-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+          <div class="min-w-0 pr-3">
+            <div class="text-xs font-medium text-white truncate">${h.stops}</div>
+            <div class="text-[10px] text-slate-400">
+              ${h.date} • ${h.synced ? '<span class="text-emerald-400">Synced ✓</span>' : '<span class="text-amber-400">Saved Offline</span>'}
+              ${h.tripId && h.tripId !== 'OFFLINE' ? `<span class="ml-1 text-[9px] text-slate-500 font-mono">(${h.tripId})</span>` : ''}
+            </div>
+          </div>
+          <div class="text-sm font-bold text-white shrink-0">${h.km > 0 ? `${h.km} km` : '—'}</div>
+        </div>
+      `).join("");
+    }
+
+    function showAlert(msg, type = "info") {
+      const banner = document.getElementById("alertBanner");
+      const msgEl = document.getElementById("alertMessage");
+      const iconEl = document.getElementById("alertIcon");
+
+      msgEl.innerText = msg;
+      banner.className = `rounded-xl p-3 border text-xs flex items-start justify-between transition-all ${
+        type === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+        type === "warning" ? "bg-amber-500/10 border-amber-500/30 text-amber-400" :
+        "bg-slate-800 border-slate-700 text-slate-300"
+      }`;
+      iconEl.innerHTML = type === "success" ? "✓" : type === "warning" ? "⚠" : "ℹ";
+      banner.classList.remove("hidden");
+    }
+
+    function dismissAlert() {
+      document.getElementById("alertBanner").classList.add("hidden");
+    }
+
+    function updateConnectionStatus(isOnline) {
+      const el = document.getElementById("connectionStatus");
+      if (isOnline) {
+        el.className = "text-[11px] text-emerald-400 font-medium flex items-center gap-1";
+        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Sheets Live`;
+      } else {
+        el.className = "text-[11px] text-amber-400 font-medium flex items-center gap-1";
+        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Offline Mode`;
+      }
+    }
+
+    function toggleSettingsModal(show) {
+      document.getElementById("settingsModal").classList.toggle("hidden", !show);
+    }
+  </script>
+</body>
+</html>
