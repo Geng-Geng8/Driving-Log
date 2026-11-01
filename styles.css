@@ -1,0 +1,291 @@
+/* ============================================================================
+   TRIP LOG — AUTOMOTIVE-GRADE MOBILE UI STYLESHEET
+   ============================================================================ */
+
+:root {
+  --bg-top: #060d17;
+  --bg-bottom: #0a1424;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-divider: rgba(255, 255, 255, 0.06);
+  --slate-surface: rgba(255, 255, 255, 0.05);
+  --slate-border: rgba(255, 255, 255, 0.1);
+  --slate-text: #cbd5e1;
+  --micro-label: #64748b;
+  --emerald-start: #059669;
+  --emerald-end: #10b981;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-top);
+  background-image: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background-attachment: fixed;
+  color: #f8fafc;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphism Surface Architecture */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 18px;
+}
+
+.glass-header {
+  background: rgba(6, 13, 23, 0.82);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-dock {
+  background: linear-gradient(180deg, rgba(6, 13, 23, 0) 0%, rgba(6, 13, 23, 0.92) 28%, rgba(6, 13, 23, 0.98) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Typography & Section Micro-Labels */
+.micro-label {
+  color: var(--micro-label);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+/* De-saturated Slate Secondary Controls */
+.chip-slate {
+  background: var(--slate-surface);
+  color: var(--slate-text);
+  border: 1px solid var(--slate-border);
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.chip-slate:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.chip-slate.is-selected {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.pill-slate {
+  background: var(--slate-surface);
+  color: var(--slate-text);
+  border: 1px solid var(--slate-border);
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.pill-slate:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.pill-slate.is-selected {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Input Fields */
+.input-automotive {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--slate-border);
+  color: #f8fafc;
+  border-radius: 14px;
+  min-height: 48px;
+  font-size: 15px;
+  transition: all 0.15s ease;
+}
+
+.input-automotive::placeholder {
+  color: #64748b;
+}
+
+.input-automotive:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+
+/* Primary Emerald CTA Button */
+.cta-emerald {
+  background: linear-gradient(135deg, var(--emerald-start) 0%, var(--emerald-end) 100%);
+  color: #ffffff;
+  min-height: 58px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 28px -6px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: all 0.15s ease;
+}
+
+.cta-emerald:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 12px 32px -4px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.cta-emerald:active:not(:disabled) {
+  transform: scale(0.98) !important;
+}
+
+/* Tactile Press Transitions */
+button,
+.tactile {
+  transition: all 0.15s ease;
+}
+
+button:not(:disabled):active,
+.tactile:active {
+  transform: scale(0.97);
+}
+
+/* Vertical Route Timeline (Apple Maps / Uber Style) */
+.timeline-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.timeline-rail {
+  position: relative;
+  width: 32px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timeline-line-bottom {
+  position: absolute;
+  top: 26px;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.timeline-line-full {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.timeline-line-top {
+  position: absolute;
+  top: 0;
+  height: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.timeline-node-origin {
+  position: relative;
+  z-index: 2;
+  margin-top: 18px;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #08111f;
+  border: 2.5px solid #cbd5e1;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+}
+
+.timeline-node-stop {
+  position: relative;
+  z-index: 2;
+  margin-top: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #131f33;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-node-dest {
+  position: relative;
+  z-index: 2;
+  margin-top: 20px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+  transition: all 0.15s ease;
+}
+
+.timeline-node-dest.is-inactive {
+  background: #475569;
+  box-shadow: none;
+}

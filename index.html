@@ -6,7 +6,7 @@
   <title>Trip Log | Circuit Mileage</title>
 
   <!-- PWA & Mobile Web App Meta -->
-  <meta name="theme-color" content="#020617">
+  <meta name="theme-color" content="#060d17">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,6 +17,7 @@
   <link rel="icon" type="image/png" href="icon.png" />
   <link rel="apple-touch-icon" href="icon.png" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -24,106 +25,378 @@
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif']
+          },
           colors: {
-            brand: { 50: '#ecfdf5', 500: '#10b981', 600: '#059669', 700: '#047857' },
-            surface: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+            brand: { 50: '#ecfdf5', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857' },
+            surface: { 800: '#131f33', 900: '#0a1424', 950: '#060d17' }
           }
         }
       }
     };
   </script>
   <style>
+    :root {
+      --bg-top: #060d17;
+      --bg-bottom: #0a1424;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-divider: rgba(255, 255, 255, 0.06);
+      --slate-surface: rgba(255, 255, 255, 0.05);
+      --slate-border: rgba(255, 255, 255, 0.1);
+      --slate-text: #cbd5e1;
+      --micro-label: #64748b;
+      --emerald-start: #059669;
+      --emerald-end: #10b981;
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-top);
+      background-image: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+      background-attachment: fixed;
+      color: #f8fafc;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
     ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Flat Glassmorphism Architecture */
+    .glass-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 18px;
+    }
+
+    .glass-header {
+      background: rgba(6, 13, 23, 0.82);
+      border-bottom: 1px solid var(--glass-border);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .glass-dock {
+      background: linear-gradient(180deg, rgba(6, 13, 23, 0) 0%, rgba(6, 13, 23, 0.92) 28%, rgba(6, 13, 23, 0.98) 100%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    /* Subtle Muted Slate Micro-Labels */
+    .micro-label {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+
+    /* Ergonomic Touch Targets & De-saturated Slate Controls */
+    .chip-slate {
+      background: rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-height: 48px;
+      padding: 0 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .chip-slate:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+
+    .chip-slate.is-selected {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.32);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+    }
+
+    .pill-slate {
+      background: rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .pill-slate:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+
+    .pill-slate.is-selected {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.32);
+    }
+
+    .input-automotive {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f8fafc;
+      border-radius: 14px;
+      min-height: 48px;
+      font-size: 15px;
+      transition: all 0.15s ease;
+    }
+
+    .input-automotive::placeholder {
+      color: #64748b;
+    }
+
+    .input-automotive:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+    }
+
+    /* Primary Emerald Dock CTA */
+    .cta-emerald {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      color: #ffffff;
+      min-height: 58px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 10px 28px -6px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      transition: all 0.15s ease;
+    }
+
+    .cta-emerald:hover:not(:disabled) {
+      filter: brightness(1.05);
+    }
+
+    .cta-emerald:active:not(:disabled) {
+      transform: scale(0.98) !important;
+    }
+
+    /* Universal Tactile Feedback */
+    button, .tactile {
+      transition: all 0.15s ease;
+    }
+
+    button:not(:disabled):active, .tactile:active {
+      transform: scale(0.97);
+    }
+
+    /* Vertical Route Timeline (Apple Maps / Uber Style) */
+    .timeline-row {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .timeline-rail {
+      position: relative;
+      width: 32px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .timeline-line-bottom {
+      position: absolute;
+      top: 26px;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .timeline-line-full {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .timeline-line-top {
+      position: absolute;
+      top: 0;
+      height: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .timeline-node-origin {
+      position: relative;
+      z-index: 2;
+      margin-top: 18px;
+      width: 12px;
+      height: 12px;
+      border-radius: 9999px;
+      background: #060d17;
+      border: 2.5px solid #cbd5e1;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+    }
+
+    .timeline-node-stop {
+      position: relative;
+      z-index: 2;
+      margin-top: 16px;
+      width: 22px;
+      height: 22px;
+      border-radius: 9999px;
+      background: #131f33;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #e2e8f0;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timeline-node-dest {
+      position: relative;
+      z-index: 2;
+      margin-top: 20px;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      background: #10b981;
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .timeline-node-dest.is-inactive {
+      background: #475569;
+      box-shadow: none;
+    }
   </style>
 </head>
-<body class="bg-surface-950 text-slate-100 min-h-screen pb-28 font-sans antialiased selection:bg-brand-500/30">
+<body class="min-h-screen pb-32 antialiased selection:bg-brand-500/30">
 
   <!-- Floating Auto-Dismiss Toast Notification -->
   <div 
     id="alertBanner" 
     role="status" 
     aria-live="polite" 
-    class="hidden fixed top-4 inset-x-4 max-w-sm mx-auto z-50 pointer-events-none rounded-xl p-3 border text-xs flex items-center justify-between shadow-2xl backdrop-blur-md transition-all duration-300 transform opacity-0 -translate-y-2"
+    class="hidden fixed top-4 inset-x-4 max-w-md mx-auto z-50 pointer-events-none rounded-2xl p-3.5 border text-xs flex items-center justify-between shadow-2xl backdrop-blur-xl transition-all duration-300 transform opacity-0 -translate-y-2"
   >
     <div class="flex items-center gap-2.5 min-w-0 pr-2">
       <span id="alertIcon" class="shrink-0 flex items-center justify-center"></span>
-      <span id="alertMessage" class="font-medium truncate text-xs"></span>
+      <span id="alertMessage" class="font-medium truncate text-[13px]"></span>
     </div>
     <button 
       type="button" 
       onclick="dismissAlert()" 
-      class="pointer-events-auto text-slate-400 hover:text-white shrink-0 p-1 -mr-1 rounded-md transition" 
+      class="pointer-events-auto text-slate-400 hover:text-white shrink-0 p-1.5 -mr-1 rounded-lg transition" 
       aria-label="Dismiss alert"
     >✕</button>
   </div>
 
-  <!-- Header & Status Bar -->
-  <header class="sticky top-0 z-40 bg-surface-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5">
+  <!-- Header & Status Bar (Clean Typography + Minimal Geometric Waypoint Glyph) -->
+  <header class="sticky top-0 z-40 glass-header px-4 py-3">
     <div class="max-w-md mx-auto flex items-center justify-between">
-      <div class="flex items-center space-x-2.5">
-        <img src="icon.png" alt="Driving Log Logo" class="w-9 h-9 object-contain rounded-xl" />
+      <div class="flex items-center gap-3">
+        <!-- Minimal Geometric Waypoint Glyph -->
+        <div class="flex items-center justify-center text-slate-300 shrink-0" aria-hidden="true">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="19" r="2.5" />
+            <path d="M8.5 19h5.5a3.5 3.5 0 0 0 0-7h-4a3.5 3.5 0 0 1 0-7H15" />
+            <polygon points="18 2 21 5 18 8 15 5 18 2" fill="currentColor" stroke="none" />
+          </svg>
+        </div>
         <div>
-          <div class="flex items-center gap-1.5">
-            <h1 class="text-sm font-semibold tracking-tight text-white leading-tight">Trip Log</h1>
-            <span id="authStatusBadge" class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded font-medium flex items-center gap-1"></span>
+          <div class="flex items-center gap-2">
+            <h1 class="text-[17px] font-semibold tracking-[-0.02em] text-white leading-none">Trip Log</h1>
+            <span id="authStatusBadge" class="text-[10px] bg-white/[0.05] text-slate-400 border border-white/[0.1] px-2 py-0.5 rounded-full font-medium flex items-center gap-1"></span>
           </div>
-          <p id="connectionStatus" class="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+          <p id="connectionStatus" class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 mt-1 leading-none">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Sheets Live
           </p>
         </div>
       </div>
-      <div class="flex items-center space-x-1.5">
-        <button id="offlineQueueBadge" onclick="flushOfflineQueue()" class="hidden text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-1 rounded-full font-medium flex items-center gap-1">
-          <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+
+      <div class="flex items-center gap-2">
+        <button id="offlineQueueBadge" onclick="flushOfflineQueue()" class="hidden min-h-[40px] text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
           <span id="queueCount">0</span> Pending
         </button>
-        <button id="syncSheetBtn" onclick="syncWithGoogleSheet(true)" aria-label="Sync with Google Sheet" title="Sync latest data from Google Sheet" class="p-2 text-slate-400 hover:text-brand-400 rounded-lg hover:bg-slate-800/60 transition active:scale-95">
-          <svg id="syncSpinIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <button id="syncSheetBtn" onclick="syncWithGoogleSheet(true)" aria-label="Sync with Google Sheet" title="Sync latest data from Google Sheet" class="w-11 h-11 flex items-center justify-center text-slate-300 hover:text-white rounded-xl bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16]">
+          <svg id="syncSpinIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         </button>
-        <button onclick="toggleSettingsModal(true)" aria-label="Settings" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <button onclick="toggleSettingsModal(true)" aria-label="Settings" class="w-11 h-11 flex items-center justify-center text-slate-300 hover:text-white rounded-xl bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-md mx-auto px-3.5 pt-3 space-y-3">
+  <main class="max-w-md mx-auto px-4 pt-4 space-y-4">
 
     <!-- Frequent GTA Schools Quick Add -->
-    <section class="space-y-1.5">
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span class="font-medium flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
-          Frequent Schools (GTA)
-        </span>
-        <button onclick="resetDefaultSchools()" class="text-[11px] text-slate-500 hover:text-slate-400">Reset</button>
+    <section class="space-y-2">
+      <div class="flex items-center justify-between px-0.5">
+        <span class="micro-label">Frequent Schools (GTA)</span>
+        <button onclick="resetDefaultSchools()" class="text-xs font-medium text-slate-400 hover:text-slate-200 px-2 py-1 -mr-2 rounded-lg">Reset</button>
       </div>
-      <div id="frequentChips" class="flex gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
-        <!-- Rendered by JS as physical map destination badges -->
+      <div id="frequentChips" class="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+        <!-- Rendered by JS with 48px ergonomic height -->
       </div>
     </section>
 
     <!-- Address & School Autocomplete Search -->
     <div class="relative">
       <div class="relative">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         </div>
         <input 
           type="text" 
           id="addressSearchInput"
           placeholder="Search school or address in Toronto..." 
-          class="w-full bg-surface-900 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 transition"
+          class="w-full input-automotive pl-11 pr-11 py-3"
           autocomplete="off"
         >
         <button 
           id="clearSearchBtn" 
           onclick="clearSearch()" 
-          class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
+          class="hidden absolute inset-y-0 right-0 w-11 flex items-center justify-center text-slate-400 hover:text-white"
           aria-label="Clear search"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -133,250 +406,261 @@
       <!-- Autocomplete Dropdown Menu -->
       <div 
         id="autocompleteResults" 
-        class="hidden absolute left-0 right-0 top-full mt-1.5 bg-surface-900/95 backdrop-blur-xl border border-slate-800 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-800/60"
+        class="hidden absolute left-0 right-0 top-full mt-2 bg-[#0c1829]/95 backdrop-blur-2xl border border-white/[0.12] rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto divide-y divide-white/[0.06]"
       >
         <!-- Populated via search -->
       </div>
     </div>
 
-    <!-- Circuit Stops List Card -->
-    <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-3.5 space-y-3 shadow-sm">
-      <div class="flex items-center justify-between pb-2 border-b border-slate-800/60">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Circuit Route</span>
-        <span id="stopsCountBadge" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-300 font-medium">2 Points</span>
+    <!-- Unified Route Timeline Card (Apple Maps / Uber Style) -->
+    <section class="glass-card p-4">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <span class="micro-label">Circuit Route</span>
+        <span id="stopsCountBadge" class="text-[11px] bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 rounded-full text-slate-300 font-medium">2 Points</span>
       </div>
 
-      <!-- Origin (Starting Point - Editable) -->
-      <div class="bg-surface-950/70 border border-slate-800/70 rounded-xl p-2.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 min-w-0">
-            <div class="w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-brand-500/20 shrink-0"></div>
-            <div class="text-[9px] font-semibold tracking-wider uppercase text-brand-500">Origin (Start Point)</div>
-            <span id="originBadge" class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium">Default Home</span>
-          </div>
-          <div class="flex items-center gap-1.5 shrink-0">
-            <button 
-              type="button" 
-              id="resetOriginBtn" 
-              onclick="resetOriginToHome()" 
-              class="hidden text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded hover:bg-slate-800/80 transition"
-              title="Reset start point to default home"
-            >
-              ↺ Reset to Home
-            </button>
-            <button 
-              type="button" 
-              id="editOriginToggleBtn"
-              onclick="toggleOriginEdit()" 
-              class="text-[10px] text-brand-400 hover:text-brand-300 font-medium px-2 py-0.5 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition flex items-center gap-1"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-              <span>Change</span>
-            </button>
-          </div>
-        </div>
+      <!-- Vertical Route Timeline Container -->
+      <div class="divide-y divide-white/[0.06]">
 
-        <!-- Display mode (tap to open edit) -->
-        <div id="originDisplayRow" class="pl-4 text-xs font-medium text-white truncate cursor-pointer hover:text-brand-300 transition" onclick="toggleOriginEdit(true)" title="Tap to change starting point">
-          <span id="originDisplay">Home — 74 Dalmatian Cres, Scarborough</span>
-        </div>
-
-        <!-- Inline Edit mode -->
-        <div id="originEditSection" class="hidden pl-1 pt-1 space-y-2 border-t border-slate-800/60">
-          <div class="relative">
-            <input 
-              type="text" 
-              id="originCustomInput" 
-              placeholder="e.g. North York, ON or 5000 Yonge St..."
-              class="w-full bg-surface-900 border border-slate-700/80 rounded-lg pl-7 pr-14 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              autocomplete="off"
-            >
-            <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-slate-500">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <!-- Node 1: Origin (Start Point) -->
+        <div class="timeline-row">
+          <div class="timeline-rail">
+            <div class="timeline-node-origin"></div>
+            <div class="timeline-line-bottom"></div>
+          </div>
+          <div class="flex-1 min-w-0 py-3.5 pl-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Origin</span>
+                <span id="originBadge" class="text-[10px] bg-white/[0.05] text-slate-400 border border-white/[0.08] px-2 py-0.5 rounded-md font-medium">Default Home</span>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button 
+                  type="button" 
+                  id="resetOriginBtn" 
+                  onclick="resetOriginToHome()" 
+                  class="hidden min-h-[34px] text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08]"
+                  title="Reset start point to default home"
+                >
+                  ↺ Home
+                </button>
+                <button 
+                  type="button" 
+                  id="editOriginToggleBtn"
+                  onclick="toggleOriginEdit()" 
+                  class="min-h-[34px] text-xs text-slate-300 hover:text-white font-medium px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/[0.1] flex items-center gap-1.5"
+                >
+                  <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  <span>Change</span>
+                </button>
+              </div>
             </div>
-            <button 
-              type="button" 
-              onclick="applyCustomOriginFromInput()" 
-              class="absolute inset-y-1 right-1 px-2.5 bg-brand-500 hover:bg-brand-600 text-surface-950 font-semibold rounded text-[10px] transition"
-            >
-              Set
-            </button>
-          </div>
-          <!-- Quick presets for starting location -->
-          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[10px]">
-            <span class="text-slate-500 shrink-0">Quick:</span>
-            <button type="button" onclick="setOriginLocation('Home Base', getDefaultHomeAddress())" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">🏠 Home</button>
-            <button type="button" onclick="setOriginLocation('North York', 'North York, ON, Canada')" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">📍 North York</button>
-            <button type="button" onclick="setOriginLocation('CEC Board Office', '80 Sheppard Ave E, North York, ON M2N 6E8')" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">CEC Office</button>
-            <button type="button" onclick="setOriginLocation('Downtown Toronto', 'Toronto City Hall, 100 Queen St W, Toronto, ON')" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">Downtown</button>
+
+            <!-- Display mode (tap to open edit) -->
+            <div id="originDisplayRow" class="mt-1 text-[14px] font-medium text-slate-100 truncate cursor-pointer hover:text-white transition" onclick="toggleOriginEdit(true)" title="Tap to change starting point">
+              <span id="originDisplay">Home — 74 Dalmatian Cres, Scarborough</span>
+            </div>
+
+            <!-- Inline Edit mode -->
+            <div id="originEditSection" class="hidden mt-3 pt-3 space-y-2.5 border-t border-white/[0.06]">
+              <div class="relative flex items-center">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <input 
+                  type="text" 
+                  id="originCustomInput" 
+                  placeholder="e.g. North York, ON or 5000 Yonge St..."
+                  class="w-full input-automotive pl-9 pr-16 py-2 text-sm min-h-[44px]"
+                  autocomplete="off"
+                >
+                <button 
+                  type="button" 
+                  onclick="applyCustomOriginFromInput()" 
+                  class="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg text-xs"
+                >
+                  Set
+                </button>
+              </div>
+              <!-- Quick presets for starting location -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <span class="text-[11px] text-slate-500 shrink-0 mr-0.5">Quick:</span>
+                <button type="button" onclick="setOriginLocation('Home Base', getDefaultHomeAddress())" class="shrink-0 min-h-[36px] px-3 py-1 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded-lg border border-white/[0.1] text-xs font-medium">Home</button>
+                <button type="button" onclick="setOriginLocation('North York', 'North York, ON, Canada')" class="shrink-0 min-h-[36px] px-3 py-1 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded-lg border border-white/[0.1] text-xs font-medium">North York</button>
+                <button type="button" onclick="setOriginLocation('CEC Board Office', '80 Sheppard Ave E, North York, ON M2N 6E8')" class="shrink-0 min-h-[36px] px-3 py-1 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded-lg border border-white/[0.1] text-xs font-medium">CEC Office</button>
+                <button type="button" onclick="setOriginLocation('Downtown Toronto', 'Toronto City Hall, 100 Queen St W, Toronto, ON')" class="shrink-0 min-h-[36px] px-3 py-1 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded-lg border border-white/[0.1] text-xs font-medium">Downtown</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Intermediate Stops Container -->
-      <div id="stopsContainer" class="space-y-2">
-        <!-- Injected dynamically -->
-      </div>
+        <!-- Intermediate Waypoint Nodes -->
+        <div id="stopsContainer" class="divide-y divide-white/[0.06]">
+          <!-- Injected dynamically as timeline rows -->
+        </div>
 
-      <!-- Return Switch -->
-      <div class="flex items-center justify-between pt-2 border-t border-slate-800/60">
-        <div class="flex items-center gap-2">
-          <svg class="w-4 h-4 text-brand-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          <div>
-            <div id="returnLabel" class="text-xs font-medium text-white">Return to Home</div>
-            <div id="returnSubtext" class="text-[10px] text-slate-400">Adds return leg back to Scarborough</div>
+        <!-- Final Node: Return / Destination Leg -->
+        <div class="timeline-row">
+          <div class="timeline-rail">
+            <div class="timeline-line-top"></div>
+            <div id="destNodeIndicator" class="timeline-node-dest"></div>
+          </div>
+          <div class="flex-1 min-w-0 py-3.5 pl-1 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div id="returnLabel" class="text-[14px] font-medium text-slate-100">Return to Home</div>
+              <div id="returnSubtext" class="text-xs text-slate-400 truncate">Adds return leg back to Scarborough</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer py-1 pl-2 shrink-0">
+              <input type="checkbox" id="returnHomeToggle" class="sr-only peer" checked onchange="handleReturnToggle()">
+              <div class="w-11 h-6 bg-white/[0.1] border border-white/[0.12] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[6px] after:left-[10px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500 peer-checked:border-brand-500"></div>
+            </label>
           </div>
         </div>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" id="returnHomeToggle" class="sr-only peer" checked onchange="handleReturnToggle()">
-          <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-500"></div>
-        </label>
+
       </div>
-    </div>
+    </section>
 
     <!-- Trip Date -->
-    <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 shadow-sm">
+    <section class="glass-card p-4 space-y-2.5">
       <div class="flex items-center justify-between">
-        <label for="tripDateInput" class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          Trip Date
-        </label>
-        <button type="button" onclick="setTripDateToToday()" class="text-[10px] text-brand-500 hover:text-brand-400 font-medium transition">Today</button>
+        <label for="tripDateInput" class="micro-label">Trip Date</label>
+        <button type="button" onclick="setTripDateToToday()" class="min-h-[32px] px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/[0.08] text-xs text-slate-300 hover:text-white font-medium">Today</button>
       </div>
       <input 
         type="date" 
         id="tripDateInput" 
         style="color-scheme: dark;"
-        class="w-full bg-surface-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition"
+        class="w-full input-automotive px-3.5 py-2.5"
       >
-    </div>
+    </section>
 
     <!-- Purpose & Quick Notes -->
-    <div class="bg-surface-900 border border-slate-800/80 rounded-2xl p-3.5 space-y-2.5 shadow-sm">
-      <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Trip Purpose & Notes</div>
-      <div class="flex flex-wrap gap-1.5">
-        <button type="button" onclick="appendNote('SHSM Workshop')" class="border border-slate-700/60 bg-slate-900/40 text-slate-400 hover:border-slate-500 hover:text-slate-200 text-[11px] rounded-full px-2.5 py-1 transition active:scale-95"># SHSM Workshop</button>
-        <button type="button" onclick="appendNote('Cypher Program')" class="border border-slate-700/60 bg-slate-900/40 text-slate-400 hover:border-slate-500 hover:text-slate-200 text-[11px] rounded-full px-2.5 py-1 transition active:scale-95"># Cypher Program</button>
-        <button type="button" onclick="appendNote('Board Meeting')" class="border border-slate-700/60 bg-slate-900/40 text-slate-400 hover:border-slate-500 hover:text-slate-200 text-[11px] rounded-full px-2.5 py-1 transition active:scale-95"># Board Meeting</button>
-        <button type="button" onclick="appendNote('Site Visit')" class="border border-slate-700/60 bg-slate-900/40 text-slate-400 hover:border-slate-500 hover:text-slate-200 text-[11px] rounded-full px-2.5 py-1 transition active:scale-95"># Site Visit</button>
+    <section class="glass-card p-4 space-y-3">
+      <div class="micro-label">Trip Purpose & Notes</div>
+      <div id="purposeTagsContainer" class="flex flex-wrap gap-2">
+        <button type="button" data-purpose="SHSM Workshop" onclick="appendNote('SHSM Workshop')" class="pill-slate"># SHSM Workshop</button>
+        <button type="button" data-purpose="Cypher Program" onclick="appendNote('Cypher Program')" class="pill-slate"># Cypher Program</button>
+        <button type="button" data-purpose="Board Meeting" onclick="appendNote('Board Meeting')" class="pill-slate"># Board Meeting</button>
+        <button type="button" data-purpose="Site Visit" onclick="appendNote('Site Visit')" class="pill-slate"># Site Visit</button>
       </div>
 
       <input 
         type="text" 
         id="tripNoteInput" 
+        oninput="syncPurposeTagStates()"
         placeholder="e.g. Student workshop delivery & mentor review" 
-        class="w-full bg-surface-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition"
+        class="w-full input-automotive px-3.5 py-2.5"
       >
-    </div>
+    </section>
 
     <!-- Sheet Sync Notice (shown if Apps Script returns write-only healthcheck) -->
-    <div id="sheetSyncBanner" class="hidden bg-surface-900 border border-amber-500/30 rounded-xl p-3 text-xs space-y-1.5 shadow-sm">
+    <div id="sheetSyncBanner" class="hidden glass-card border-amber-500/30 p-4 text-xs space-y-2">
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-2 text-amber-400 font-semibold">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
           <span>Mirror All Sheet Trips on Phone</span>
         </div>
-        <button onclick="document.getElementById('sheetSyncBanner').classList.add('hidden')" class="text-slate-500 hover:text-white text-xs">✕</button>
+        <button onclick="document.getElementById('sheetSyncBanner').classList.add('hidden')" class="text-slate-400 hover:text-white p-1">✕</button>
       </div>
-      <p class="text-[11px] text-slate-400 leading-relaxed">
+      <p class="text-xs text-slate-400 leading-relaxed">
         Your Google Sheet receives new drives, but its Apps Script needs the read script to show existing trips on your phone.
       </p>
-      <div class="flex items-center gap-2 pt-0.5">
-        <button onclick="toggleSettingsModal(true); toggleAppsScriptGuide(true);" class="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg font-medium transition">
+      <div class="pt-1">
+        <button onclick="toggleSettingsModal(true); toggleAppsScriptGuide(true);" class="min-h-[38px] text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-xl font-medium">
           View Apps Script Code & 3-Step Setup
         </button>
       </div>
     </div>
 
     <!-- Recent Drives History Feed -->
-    <div class="space-y-1.5 pt-1">
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span class="font-medium flex items-center gap-1.5">
-          Recent Logged Drives
-          <button type="button" onclick="syncWithGoogleSheet(true)" class="text-[10px] text-brand-500 hover:text-brand-400 transition" title="Sync from Google Sheet">↻ Sync</button>
+    <section class="space-y-2.5 pt-1">
+      <div class="flex items-center justify-between px-0.5">
+        <span class="micro-label flex items-center gap-2">
+          <span>Recent Logged Drives</span>
+          <button type="button" onclick="syncWithGoogleSheet(true)" class="text-xs text-slate-400 hover:text-white font-medium normal-case tracking-normal px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08]" title="Sync from Google Sheet">↻ Sync</button>
         </span>
-        <span id="sessionTotalKm" class="text-brand-500 font-semibold">0.0 KM Logged</span>
+        <span id="sessionTotalKm" class="text-xs text-slate-300 font-semibold">0.0 KM Logged</span>
       </div>
-      <div id="recentDrivesFeed" class="space-y-2">
+      <div id="recentDrivesFeed" class="space-y-2.5">
         <!-- Rendered by JS -->
       </div>
-    </div>
+    </section>
 
   </main>
 
-  <!-- Sticky Bottom Submission Bar -->
-  <footer class="fixed bottom-0 inset-x-0 bg-surface-950/95 backdrop-blur-lg border-t border-slate-800 p-3.5 z-40" onclick="handleFooterClick(event)">
+  <!-- Floating Bottom Primary Dock -->
+  <footer class="fixed bottom-0 inset-x-0 glass-dock px-4 pt-3 pb-4 z-40" onclick="handleFooterClick(event)">
     <div class="max-w-md mx-auto">
       <button 
         id="submitDriveBtn" 
         onclick="recordAndSyncDrive()" 
-        class="w-full bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-surface-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:pointer-events-none"
+        class="cta-emerald w-full flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:pointer-events-none"
       >
-        <span id="btnIcon">
+        <span id="btnIcon" class="flex items-center justify-center">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
         </span>
-        <span id="btnText" class="text-sm tracking-wide">Record Circuit & Save to Sheet</span>
+        <span id="btnText">Record Circuit & Save to Sheet</span>
       </button>
     </div>
   </footer>
 
   <!-- Settings Modal -->
-  <div id="settingsModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-surface-900 border border-slate-800 rounded-2xl max-w-sm w-full p-4 space-y-3.5 shadow-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-[#0b1526] border border-white/[0.12] rounded-2xl max-w-sm w-full p-4 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2.5 border-b border-white/[0.08]">
         <h3 class="text-sm font-semibold text-white">App Configuration</h3>
-        <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white p-1" aria-label="Close modal">✕</button>
+        <button onclick="toggleSettingsModal(false)" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white rounded-lg bg-white/[0.04]" aria-label="Close modal">✕</button>
       </div>
 
       <!-- Magic Link / Authorization Notice Card -->
       <div id="modalAuthNotice"></div>
 
-      <div class="space-y-3 text-xs">
+      <div class="space-y-3.5 text-xs">
         <div>
-          <label class="block text-slate-400 mb-1">Default Home Base (Scarborough)</label>
-          <input type="text" id="configHomeInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:ring-1 focus:ring-brand-500">
+          <label class="block micro-label mb-1.5">Default Home Base (Scarborough)</label>
+          <input type="text" id="configHomeInput" class="w-full input-automotive px-3 py-2 text-sm min-h-[44px]">
         </div>
         <div id="configEndpointWrapper">
-          <div class="flex items-center justify-between mb-1">
-            <label class="block text-slate-400">Google Apps Script Endpoint</label>
-            <span id="endpointLockNotice" class="text-[10px] text-amber-400 font-medium"></span>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block micro-label">Google Apps Script Endpoint</label>
+            <span id="endpointLockNotice" class="text-[11px] text-amber-400 font-medium"></span>
           </div>
-          <input type="text" id="configScriptUrlInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 transition">
+          <input type="text" id="configScriptUrlInput" class="w-full input-automotive px-3 py-2 text-[11px] font-mono min-h-[44px]">
         </div>
       </div>
 
       <!-- Google Apps Script 2-Way Sync Guide -->
-      <div class="pt-2 border-t border-slate-800/80">
+      <div class="pt-3 border-t border-white/[0.08]">
         <div class="flex items-center justify-between">
-          <span class="text-slate-300 font-medium text-[11px]">Google Apps Script (2-Way Sync)</span>
-          <button type="button" onclick="toggleAppsScriptGuide()" class="text-brand-400 hover:text-brand-300 text-[10px] font-semibold">
+          <span class="text-slate-300 font-medium text-xs">Google Apps Script (2-Way Sync)</span>
+          <button type="button" onclick="toggleAppsScriptGuide()" class="text-slate-300 hover:text-white text-xs font-semibold px-2 py-1 rounded bg-white/[0.05] border border-white/[0.1]">
             <span id="guideToggleText">View Code.gs</span>
           </button>
         </div>
-        <p class="text-[10px] text-slate-400 mt-0.5">Allows phones and other devices to read and mirror logged trips from your Google Sheet.</p>
+        <p class="text-[11px] text-slate-400 mt-1">Allows phones and other devices to read and mirror logged trips from your Google Sheet.</p>
         
-        <div id="appsScriptGuide" class="hidden mt-2 space-y-2">
-          <div class="text-[10px] text-slate-300 space-y-1 bg-surface-950 p-2.5 rounded-lg border border-slate-800">
+        <div id="appsScriptGuide" class="hidden mt-2.5 space-y-2">
+          <div class="text-[11px] text-slate-300 space-y-1 bg-black/30 p-3 rounded-xl border border-white/[0.08]">
             <p class="font-medium text-white">How to enable Sheet sync on phone:</p>
-            <ol class="list-decimal list-inside space-y-0.5 text-slate-400">
+            <ol class="list-decimal list-inside space-y-1 text-slate-400">
               <li>In your Google Sheet, click <strong class="text-slate-200">Extensions > Apps Script</strong></li>
               <li>Replace <strong class="text-slate-200">Code.gs</strong> with the code below</li>
               <li>Click <strong class="text-slate-200">Deploy > Manage deployments > Edit > New version > Deploy</strong></li>
             </ol>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-[10px] text-slate-500 font-mono">Code.gs</span>
-            <button type="button" onclick="copyAppsScriptCode()" id="copyCodeBtn" class="text-[10px] bg-brand-500/20 text-brand-400 border border-brand-500/40 px-2 py-0.5 rounded hover:bg-brand-500/30 transition">
+            <span class="text-[11px] text-slate-500 font-mono">Code.gs</span>
+            <button type="button" onclick="copyAppsScriptCode()" id="copyCodeBtn" class="text-[11px] bg-white/[0.06] text-slate-200 border border-white/[0.12] px-2.5 py-1 rounded-lg hover:bg-white/[0.1] transition">
               Copy Code
             </button>
           </div>
-          <textarea id="appsScriptCodeBlock" readonly class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-[10px] text-slate-300 font-mono h-28 resize-none focus:outline-none"></textarea>
+          <textarea id="appsScriptCodeBlock" readonly class="w-full bg-black/40 border border-white/[0.1] rounded-xl p-2.5 text-[10px] text-slate-300 font-mono h-28 resize-none focus:outline-none"></textarea>
         </div>
       </div>
 
-      <div class="pt-2 flex justify-end gap-2 border-t border-slate-800/60">
-        <button onclick="toggleSettingsModal(false)" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white rounded-lg transition">Cancel</button>
-        <button id="saveSettingsBtn" onclick="saveConfiguration()" class="px-4 py-1.5 text-xs bg-brand-500 hover:bg-brand-600 font-semibold text-surface-950 rounded-lg transition">Save Settings</button>
+      <div class="pt-3 flex justify-end gap-2 border-t border-white/[0.08]">
+        <button onclick="toggleSettingsModal(false)" class="min-h-[42px] px-4 py-2 text-xs text-slate-300 hover:text-white rounded-xl bg-white/[0.04] border border-white/[0.08]">Cancel</button>
+        <button id="saveSettingsBtn" onclick="saveConfiguration()" class="min-h-[42px] px-5 py-2 text-xs bg-brand-500 hover:bg-brand-600 font-semibold text-white rounded-xl">Save Settings</button>
       </div>
     </div>
   </div>
@@ -470,11 +754,11 @@
       // 1. Header status badge
       if (authBadge) {
         if (authorized) {
-          authBadge.className = "text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium flex items-center gap-1";
+          authBadge.className = "text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded-full font-medium flex items-center gap-1";
           authBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Owner`;
           authBadge.title = "Authorized via Magic Link";
         } else {
-          authBadge.className = "text-[9px] bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded font-medium flex items-center gap-1";
+          authBadge.className = "text-[10px] bg-white/[0.05] text-slate-400 border border-white/[0.1] px-2 py-0.5 rounded-full font-medium flex items-center gap-1";
           authBadge.innerHTML = `<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> View-Only`;
           authBadge.title = "View-Only Mode. Trip recording is locked.";
         }
@@ -484,12 +768,12 @@
       if (btn && btnText && btnIcon) {
         if (authorized) {
           btn.disabled = false;
-          btn.className = "w-full bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-surface-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:pointer-events-none";
+          btn.className = "cta-emerald w-full flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:pointer-events-none";
           btnText.innerText = "Record Circuit & Save to Sheet";
           btnIcon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
         } else {
           btn.disabled = true;
-          btn.className = "w-full bg-slate-800/80 border border-slate-700/60 text-slate-400 font-semibold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 cursor-not-allowed select-none transition";
+          btn.className = "w-full min-h-[58px] rounded-[16px] bg-white/[0.05] border border-white/[0.1] text-slate-400 font-semibold text-[15px] flex items-center justify-center gap-2 cursor-not-allowed select-none transition";
           btnText.innerText = "🔒 View-Only Mode";
           btnIcon.innerHTML = `<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>`;
         }
@@ -516,20 +800,20 @@
       if (modalNotice) {
         if (authorized) {
           modalNotice.innerHTML = `
-            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 text-xs flex items-center justify-between">
+            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs flex items-center justify-between">
               <div class="flex items-center gap-2 text-emerald-400 font-medium">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 <span>Owner Authorized</span>
               </div>
-              <button type="button" onclick="revokeAuthorization()" class="text-[10px] text-slate-400 hover:text-rose-400 px-2 py-0.5 rounded border border-slate-700/60 hover:border-rose-500/40 transition">
+              <button type="button" onclick="revokeAuthorization()" class="text-[11px] text-slate-300 hover:text-rose-400 px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/[0.1] transition">
                 Lock App
               </button>
             </div>
           `;
         } else {
           modalNotice.innerHTML = `
-            <div class="bg-surface-950 border border-slate-800 rounded-xl p-3 text-xs space-y-2">
-              <div class="flex items-center gap-2 text-slate-300 font-medium">
+            <div class="bg-black/30 border border-white/[0.08] rounded-xl p-3.5 text-xs space-y-2.5">
+              <div class="flex items-center gap-2 text-slate-200 font-medium">
                 <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 <span>View-Only Mode</span>
               </div>
@@ -537,8 +821,8 @@
                 Recording drives and endpoint changes are restricted to the owner. Access via your personal Magic Link (<code class="text-slate-300">?key=...</code>) or enter your secret key below:
               </p>
               <div class="flex items-center gap-2 pt-0.5">
-                <input type="password" id="manualSecretInput" placeholder="Enter secret key..." class="flex-1 bg-surface-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500">
-                <button type="button" onclick="unlockWithManualKey()" class="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-surface-950 font-semibold text-xs rounded-lg transition shrink-0">Unlock</button>
+                <input type="password" id="manualSecretInput" placeholder="Enter secret key..." class="flex-1 input-automotive px-3 py-2 text-xs min-h-[40px]">
+                <button type="button" onclick="unlockWithManualKey()" class="min-h-[40px] px-3.5 py-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs rounded-xl shrink-0">Unlock</button>
               </div>
             </div>
           `;
@@ -635,7 +919,7 @@
       if (currentOrigin) {
         displayEl.innerText = `${currentOrigin.name} — ${currentOrigin.address}`;
         badgeEl.innerText = "Custom Start";
-        badgeEl.className = "text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium";
+        badgeEl.className = "text-[10px] bg-white/[0.12] text-white border border-white/[0.25] px-2 py-0.5 rounded-md font-medium";
         resetBtn.classList.remove("hidden");
         returnLabel.innerText = "Return to Start Point";
         const shortName = currentOrigin.name || currentOrigin.address.split(",")[0];
@@ -643,7 +927,7 @@
       } else {
         displayEl.innerText = `Home — ${defaultHome}`;
         badgeEl.innerText = "Default Home";
-        badgeEl.className = "text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium";
+        badgeEl.className = "text-[10px] bg-white/[0.05] text-slate-400 border border-white/[0.08] px-2 py-0.5 rounded-md font-medium";
         resetBtn.classList.add("hidden");
         returnLabel.innerText = "Return to Home";
         returnSubtext.innerText = "Adds return leg back to Scarborough";
@@ -704,21 +988,26 @@
     }
 
     // -------------------------------------------------------------
-    // FREQUENT SCHOOLS BAR (Physical Map Destination Badges)
+    // FREQUENT SCHOOLS BAR (48px Ergonomic Slate Chips)
     // -------------------------------------------------------------
     function renderFrequentChips() {
       const container = document.getElementById("frequentChips");
-      container.innerHTML = PRESET_SCHOOLS.map(school => `
-        <button 
-          type="button"
-          onclick="addStop('${school.name.replace(/'/g, "\\'")}', '${school.address.replace(/'/g, "\\'")}')" 
-          class="shrink-0 bg-surface-900 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm group"
-          title="${school.address.replace(/"/g, '&quot;')}"
-        >
-          <svg class="w-3 h-3 text-brand-500/80 group-hover:text-brand-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          <span class="font-medium">${school.name}</span>
-        </button>
-      `).join("");
+      if (!container) return;
+
+      container.innerHTML = PRESET_SCHOOLS.map(school => {
+        const isSelected = currentStops.some(s => s.name === school.name);
+        return `
+          <button 
+            type="button"
+            onclick="addStop('${school.name.replace(/'/g, "\\'")}', '${school.address.replace(/'/g, "\\'")}')" 
+            class="shrink-0 chip-slate ${isSelected ? 'is-selected' : ''}"
+            title="${school.address.replace(/"/g, '&quot;')}"
+          >
+            <svg class="w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'} shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>${school.name}</span>
+          </button>
+        `;
+      }).join("");
     }
 
     function resetDefaultSchools() {
@@ -785,15 +1074,15 @@
 
       if (combined.length === 0) {
         resultsContainer.innerHTML = `
-          <div class="p-2.5 px-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between transition">
+          <div class="p-3.5 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-2 transition">
             <div onclick="addStop('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" class="flex-1 min-w-0 pr-2">
               <div class="font-medium text-white truncate">${query}</div>
-              <div class="text-[11px] text-slate-400">Add stop with Toronto, ON bias</div>
+              <div class="text-xs text-slate-400">Add waypoint with Toronto, ON bias</div>
             </div>
             <button 
               type="button" 
               onclick="event.stopPropagation(); setOriginLocation('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" 
-              class="text-[10px] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/40 px-1.5 py-0.5 rounded transition shrink-0"
+              class="min-h-[38px] text-xs text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] px-3 py-1.5 rounded-xl shrink-0"
             >
               Set Start
             </button>
@@ -801,16 +1090,16 @@
         `;
       } else {
         resultsContainer.innerHTML = combined.map(item => `
-          <div class="p-2.5 px-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between transition group">
+          <div class="p-3 px-3.5 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-2 transition">
             <div onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" class="min-w-0 pr-2 flex-1">
-              <div class="font-medium text-white truncate">${item.name}</div>
-              <div class="text-[11px] text-slate-400 truncate">${item.address}</div>
+              <div class="font-medium text-white truncate text-[14px]">${item.name}</div>
+              <div class="text-xs text-slate-400 truncate">${item.address}</div>
             </div>
-            <div class="flex items-center gap-1.5 shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
               <button 
                 type="button" 
                 onclick="event.stopPropagation(); setOriginLocation('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" 
-                class="text-[10px] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/40 px-1.5 py-0.5 rounded transition"
+                class="min-h-[38px] text-xs text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] px-2.5 py-1 rounded-xl"
                 title="Use as starting point for this trip"
               >
                 Set Start
@@ -818,7 +1107,7 @@
               <button 
                 type="button" 
                 onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" 
-                class="w-6 h-6 rounded bg-brand-500/10 hover:bg-brand-500/20 text-brand-500 font-bold flex items-center justify-center transition"
+                class="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white font-semibold flex items-center justify-center"
                 title="Add stop"
               >
                 +
@@ -840,49 +1129,69 @@
       input.value = "";
       document.getElementById("clearSearchBtn").classList.add("hidden");
       hideAutocomplete();
-      input.focus();
     }
 
     // -------------------------------------------------------------
-    // STOPS LIST LOGIC
+    // STOPS LIST LOGIC (Vertical Route Timeline Nodes)
     // -------------------------------------------------------------
     function addStop(name, address) {
       currentStops.push({ id: Math.random().toString(36).substr(2, 9), name, address });
       clearSearch();
       renderStops();
+      renderFrequentChips();
     }
 
     function removeStop(index) {
       currentStops.splice(index, 1);
       renderStops();
+      renderFrequentChips();
     }
 
     function renderStops() {
       const container = document.getElementById("stopsContainer");
       const badge = document.getElementById("stopsCountBadge");
       const isReturn = document.getElementById("returnHomeToggle").checked;
+      const destNode = document.getElementById("destNodeIndicator");
       const totalPoints = currentStops.length + (isReturn ? 2 : 1);
       badge.innerText = `${totalPoints} Point${totalPoints !== 1 ? 's' : ''}`;
 
+      if (destNode) {
+        destNode.classList.toggle("is-inactive", !isReturn);
+      }
+
       if (currentStops.length === 0) {
         container.innerHTML = `
-          <div class="border border-dashed border-slate-800 rounded-xl p-3 text-center">
-            <p class="text-xs text-slate-500">Tap a frequent school chip or search an address above</p>
+          <div class="timeline-row">
+            <div class="timeline-rail">
+              <div class="timeline-line-full"></div>
+              <div class="timeline-node-stop opacity-50">•</div>
+            </div>
+            <div class="flex-1 min-w-0 py-3.5 pl-1">
+              <p class="text-[13px] text-slate-500">Tap a school chip above or search an address to add stops</p>
+            </div>
           </div>
         `;
         return;
       }
 
       container.innerHTML = currentStops.map((stop, i) => `
-        <div class="flex items-center gap-2.5 bg-surface-950 border border-slate-800/80 rounded-xl p-2.5">
-          <div class="w-5 h-5 rounded-full bg-slate-800 text-brand-500 text-[10px] font-bold flex items-center justify-center shrink-0">
-            ${i + 1}
+        <div class="timeline-row">
+          <div class="timeline-rail">
+            <div class="timeline-line-full"></div>
+            <div class="timeline-node-stop">${i + 1}</div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-white truncate">${stop.name}</div>
-            <div class="text-[10px] text-slate-400 truncate">${stop.address}</div>
+          <div class="flex-1 min-w-0 py-3 pl-1 flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="text-[14px] font-medium text-white truncate">${stop.name}</div>
+              <div class="text-xs text-slate-400 truncate">${stop.address}</div>
+            </div>
+            <button 
+              type="button"
+              onclick="removeStop(${i})" 
+              class="w-10 h-10 -mr-1 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-white/[0.05] shrink-0" 
+              aria-label="Remove stop"
+            >✕</button>
           </div>
-          <button onclick="removeStop(${i})" class="text-slate-500 hover:text-rose-400 p-1 rounded transition" aria-label="Remove stop">✕</button>
         </div>
       `).join("");
     }
@@ -894,6 +1203,17 @@
     function appendNote(tag) {
       const input = document.getElementById("tripNoteInput");
       input.value = input.value ? `${input.value} • ${tag}` : tag;
+      syncPurposeTagStates();
+    }
+
+    function syncPurposeTagStates() {
+      const input = document.getElementById("tripNoteInput");
+      const val = (input ? input.value : "").toLowerCase();
+      const buttons = document.querySelectorAll("#purposeTagsContainer button[data-purpose]");
+      buttons.forEach(btn => {
+        const tag = (btn.getAttribute("data-purpose") || "").toLowerCase();
+        btn.classList.toggle("is-selected", Boolean(tag && val.includes(tag)));
+      });
     }
 
     // -------------------------------------------------------------
@@ -1080,14 +1400,14 @@
         const isHome = part.toLowerCase() === "home";
 
         const badgeHtml = isHome
-          ? `<span class="text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px]">Home</span>`
+          ? `<span class="text-slate-200 font-medium bg-white/[0.06] border border-white/[0.1] px-2 py-0.5 rounded-md text-[11px]">Home</span>`
           : `<span class="text-slate-100 font-medium">${part}</span>`;
 
         if (isLast) {
           return badgeHtml;
         }
 
-        return `${badgeHtml} <span class="text-brand-500 font-bold text-[10px]">→</span>`;
+        return `${badgeHtml} <span class="text-slate-500 font-semibold text-xs">→</span>`;
       }).join(" ");
     }
 
@@ -1192,6 +1512,8 @@
       document.getElementById("tripNoteInput").value = "";
       setTripDateToToday();
       renderStops();
+      renderFrequentChips();
+      syncPurposeTagStates();
     }
 
     function setSubmittingState(active) {
@@ -1288,9 +1610,9 @@
 
       if (history.length === 0) {
         feed.innerHTML = `
-          <div class="bg-surface-900 border border-slate-800 rounded-xl p-3 text-center">
-            <p class="text-xs text-slate-400">No drives logged yet</p>
-            <p class="text-[10px] text-slate-500 mt-0.5">Drives will mirror from your Google Sheet here.</p>
+          <div class="glass-card p-5 text-center">
+            <p class="text-sm text-slate-300 font-medium">No drives logged yet</p>
+            <p class="text-xs text-slate-500 mt-1">Drives will mirror from your Google Sheet here.</p>
           </div>
         `;
         return;
@@ -1303,23 +1625,22 @@
         const dateStr = h.date || (h.timestamp ? String(h.timestamp).slice(0, 10) : "");
 
         return `
-          <div class="bg-surface-900 border border-slate-800/90 rounded-xl p-3 space-y-2 shadow-sm">
+          <div class="glass-card p-3.5 space-y-2.5">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0 flex-1">
-                <div class="text-xs font-semibold text-white leading-snug flex items-center flex-wrap gap-1">
+                <div class="text-[13px] font-semibold text-white leading-snug flex items-center flex-wrap gap-1.5">
                   ${routeHtml}
                 </div>
               </div>
-              <div class="text-sm font-bold text-white shrink-0">${formattedKm}</div>
+              <div class="text-[15px] font-bold text-white shrink-0 tabular-nums">${formattedKm}</div>
             </div>
-            <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60">
-              <div class="flex items-center gap-1.5 truncate">
-                <span>${dateStr}</span>
-                ${h.notes ? `<span>•</span> <span class="text-slate-300 font-medium truncate">${h.notes}</span>` : ""}
+            <div class="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-white/[0.06]">
+              <div class="flex items-center gap-1.5 truncate pr-2">
+                <span class="tabular-nums text-slate-400">${dateStr}</span>
+                ${h.notes ? `<span class="text-slate-600">•</span> <span class="text-slate-300 font-medium truncate">${h.notes}</span>` : ""}
               </div>
               <div class="shrink-0 flex items-center gap-1.5">
-                ${h.synced !== false ? '<span class="text-emerald-400 text-[10px] font-medium flex items-center gap-0.5"><svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Synced</span>' : '<span class="text-amber-400 text-[10px]">Saved Offline</span>'}
-                ${h.tripId && h.tripId !== 'OFFLINE' ? `<span class="text-[9px] text-slate-500 font-mono">(${h.tripId})</span>` : ''}
+                ${h.synced !== false ? '<span class="text-emerald-400 text-[11px] font-medium flex items-center gap-1"><svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Synced</span>' : '<span class="text-amber-400 text-[11px] font-medium">Saved Offline</span>'}
               </div>
             </div>
           </div>
@@ -1337,12 +1658,12 @@
       msgEl.innerText = msg;
       
       const theme = type === "success" 
-        ? "bg-surface-900/95 border-emerald-500/50 text-emerald-400 shadow-emerald-950/50" 
+        ? "bg-[#0b1728]/95 border-emerald-500/40 text-emerald-400 shadow-emerald-950/50" 
         : type === "warning" 
-        ? "bg-surface-900/95 border-amber-500/50 text-amber-400 shadow-amber-950/50" 
-        : "bg-surface-900/95 border-slate-700 text-slate-200 shadow-slate-950/50";
+        ? "bg-[#0b1728]/95 border-amber-500/40 text-amber-300 shadow-amber-950/50" 
+        : "bg-[#0b1728]/95 border-white/[0.15] text-slate-200 shadow-black/60";
 
-      banner.className = `fixed top-4 inset-x-4 max-w-sm mx-auto z-50 pointer-events-none rounded-xl p-3 border text-xs flex items-center justify-between shadow-2xl backdrop-blur-md transition-all duration-300 transform translate-y-0 opacity-100 ${theme}`;
+      banner.className = `fixed top-4 inset-x-4 max-w-md mx-auto z-50 pointer-events-none rounded-2xl p-3.5 border text-xs flex items-center justify-between shadow-2xl backdrop-blur-xl transition-all duration-300 transform translate-y-0 opacity-100 ${theme}`;
       
       iconEl.innerHTML = type === "success" 
         ? `<svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>` 
@@ -1366,10 +1687,10 @@
     function updateConnectionStatus(isOnline, labelText = null) {
       const el = document.getElementById("connectionStatus");
       if (!isOnline) {
-        el.className = "text-[11px] text-amber-400 font-medium flex items-center gap-1";
+        el.className = "text-[11px] text-amber-400 font-medium flex items-center gap-1.5 mt-1 leading-none";
         el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Offline Mode`;
       } else {
-        el.className = "text-[11px] text-emerald-400 font-medium flex items-center gap-1";
+        el.className = "text-[11px] text-emerald-400 font-medium flex items-center gap-1.5 mt-1 leading-none";
         el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ${labelText || 'Sheets Live'}`;
       }
     }
