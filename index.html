@@ -61,10 +61,13 @@
           </p>
         </div>
       </div>
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center space-x-1.5">
         <button id="offlineQueueBadge" onclick="flushOfflineQueue()" class="hidden text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-1 rounded-full font-medium flex items-center gap-1">
           <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
           <span id="queueCount">0</span> Pending
+        </button>
+        <button id="syncSheetBtn" onclick="syncWithGoogleSheet(true)" aria-label="Sync with Google Sheet" title="Sync latest data from Google Sheet" class="p-2 text-slate-400 hover:text-brand-400 rounded-lg hover:bg-slate-800/60 transition active:scale-95">
+          <svg id="syncSpinIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         </button>
         <button onclick="toggleSettingsModal(true)" aria-label="Settings" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -115,7 +118,7 @@
       <!-- Autocomplete Dropdown Menu -->
       <div 
         id="autocompleteResults" 
-        class="hidden absolute left-0 right-0 top-full mt-1.5 bg-surface-900/95 backdrop-blur-xl border border-slate-800 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-800/60"
+        class="hidden absolute left-0 right-0 top-full mt-1.5 bg-surface-900/95 backdrop-blur-xl border border-slate-800 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-800/60"
       >
         <!-- Populated via search -->
       </div>
@@ -128,14 +131,71 @@
         <span id="stopsCountBadge" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-300 font-medium">2 Points</span>
       </div>
 
-      <!-- Origin: Scarborough Home Base -->
-      <div class="flex items-center gap-2.5 bg-surface-950/70 border border-slate-800/70 rounded-xl p-2.5">
-        <div class="w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-brand-500/20 shrink-0"></div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[9px] font-semibold tracking-wider uppercase text-brand-500">Origin (Start)</div>
-          <div id="originDisplay" class="text-xs font-medium text-white truncate">Home — 74 Dalmatian Cres, Scarborough</div>
+      <!-- Origin (Starting Point - Editable) -->
+      <div class="bg-surface-950/70 border border-slate-800/70 rounded-xl p-2.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-brand-500/20 shrink-0"></div>
+            <div class="text-[9px] font-semibold tracking-wider uppercase text-brand-500">Origin (Start Point)</div>
+            <span id="originBadge" class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium">Default Home</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button 
+              type="button" 
+              id="resetOriginBtn" 
+              onclick="resetOriginToHome()" 
+              class="hidden text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded hover:bg-slate-800/80 transition"
+              title="Reset start point to default home"
+            >
+              ↺ Reset to Home
+            </button>
+            <button 
+              type="button" 
+              id="editOriginToggleBtn"
+              onclick="toggleOriginEdit()" 
+              class="text-[10px] text-brand-400 hover:text-brand-300 font-medium px-2 py-0.5 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition flex items-center gap-1"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              <span>Change</span>
+            </button>
+          </div>
         </div>
-        <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded shrink-0">Default</span>
+
+        <!-- Display mode (tap to open edit) -->
+        <div id="originDisplayRow" class="pl-4 text-xs font-medium text-white truncate cursor-pointer hover:text-brand-300 transition" onclick="toggleOriginEdit(true)" title="Tap to change starting point">
+          <span id="originDisplay">Home — 74 Dalmatian Cres, Scarborough</span>
+        </div>
+
+        <!-- Inline Edit mode -->
+        <div id="originEditSection" class="hidden pl-1 pt-1 space-y-2 border-t border-slate-800/60">
+          <div class="relative">
+            <input 
+              type="text" 
+              id="originCustomInput" 
+              placeholder="e.g. North York, ON or 5000 Yonge St..."
+              class="w-full bg-surface-900 border border-slate-700/80 rounded-lg pl-7 pr-14 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              autocomplete="off"
+            >
+            <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-slate-500">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <button 
+              type="button" 
+              onclick="applyCustomOriginFromInput()" 
+              class="absolute inset-y-1 right-1 px-2.5 bg-brand-500 hover:bg-brand-600 text-surface-950 font-semibold rounded text-[10px] transition"
+            >
+              Set
+            </button>
+          </div>
+          <!-- Quick presets for starting location -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[10px]">
+            <span class="text-slate-500 shrink-0">Quick:</span>
+            <button type="button" onclick="setOriginLocation('Home Base', getDefaultHomeAddress())" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">🏠 Home</button>
+            <button type="button" onclick="setOriginLocation('North York', 'North York, ON, Canada')" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">📍 North York</button>
+            <button type="button" onclick="setOriginLocation('CEC Board Office', '80 Sheppard Ave E, North York, ON M2N 6E8')" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">CEC Office</button>
+            <button type="button" onclick="setOriginLocation('Downtown Toronto', 'Toronto City Hall, 100 Queen St W, Toronto, ON')" class="shrink-0 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/60">Downtown</button>
+          </div>
+        </div>
       </div>
 
       <!-- Intermediate Stops Container -->
@@ -143,13 +203,13 @@
         <!-- Injected dynamically -->
       </div>
 
-      <!-- Return to Home Switch -->
+      <!-- Return Switch -->
       <div class="flex items-center justify-between pt-2 border-t border-slate-800/60">
         <div class="flex items-center gap-2">
           <svg class="w-4 h-4 text-brand-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           <div>
-            <div class="text-xs font-medium text-white">Return to Home</div>
-            <div class="text-[10px] text-slate-400">Adds return leg back to Scarborough</div>
+            <div id="returnLabel" class="text-xs font-medium text-white">Return to Home</div>
+            <div id="returnSubtext" class="text-[10px] text-slate-400">Adds return leg back to Scarborough</div>
           </div>
         </div>
         <label class="relative inline-flex items-center cursor-pointer">
@@ -194,10 +254,32 @@
       >
     </div>
 
+    <!-- Sheet Sync Notice (shown if Apps Script returns write-only healthcheck) -->
+    <div id="sheetSyncBanner" class="hidden bg-surface-900 border border-amber-500/30 rounded-xl p-3 text-xs space-y-1.5 shadow-sm">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-2 text-amber-400 font-semibold">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Mirror All Sheet Trips on Phone</span>
+        </div>
+        <button onclick="document.getElementById('sheetSyncBanner').classList.add('hidden')" class="text-slate-500 hover:text-white text-xs">✕</button>
+      </div>
+      <p class="text-[11px] text-slate-400 leading-relaxed">
+        Your Google Sheet receives new drives, but its Apps Script needs the read script to show existing trips on your phone.
+      </p>
+      <div class="flex items-center gap-2 pt-0.5">
+        <button onclick="toggleSettingsModal(true); toggleAppsScriptGuide(true);" class="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg font-medium transition">
+          View Apps Script Code & 3-Step Setup
+        </button>
+      </div>
+    </div>
+
     <!-- Recent Drives History Feed -->
     <div class="space-y-1.5 pt-1">
       <div class="flex items-center justify-between text-xs text-slate-400">
-        <span class="font-medium">Recent Logged Drives</span>
+        <span class="font-medium flex items-center gap-1.5">
+          Recent Logged Drives
+          <button type="button" onclick="syncWithGoogleSheet(true)" class="text-[10px] text-brand-500 hover:text-brand-400 transition" title="Sync from Google Sheet">↻ Sync</button>
+        </span>
         <span id="sessionTotalKm" class="text-brand-500 font-semibold">0.0 KM Logged</span>
       </div>
       <div id="recentDrivesFeed" class="space-y-2">
@@ -225,14 +307,14 @@
 
   <!-- Settings Modal -->
   <div id="settingsModal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-surface-900 border border-slate-800 rounded-2xl max-w-sm w-full p-4 space-y-3.5 shadow-2xl">
+    <div class="bg-surface-900 border border-slate-800 rounded-2xl max-w-sm w-full p-4 space-y-3.5 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between pb-2 border-b border-slate-800">
         <h3 class="text-sm font-semibold text-white">App Configuration</h3>
         <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white p-1" aria-label="Close modal">✕</button>
       </div>
       <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-slate-400 mb-1">Home Address (Origin & Return)</label>
+          <label class="block text-slate-400 mb-1">Default Home Base (Scarborough)</label>
           <input type="text" id="configHomeInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:ring-1 focus:ring-brand-500">
         </div>
         <div>
@@ -240,6 +322,36 @@
           <input type="text" id="configScriptUrlInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-brand-500">
         </div>
       </div>
+
+      <!-- Google Apps Script 2-Way Sync Guide -->
+      <div class="pt-2 border-t border-slate-800/80">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-300 font-medium text-[11px]">Google Apps Script (2-Way Sync)</span>
+          <button type="button" onclick="toggleAppsScriptGuide()" class="text-brand-400 hover:text-brand-300 text-[10px] font-semibold">
+            <span id="guideToggleText">View Code.gs</span>
+          </button>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-0.5">Allows phones and other devices to read and mirror logged trips from your Google Sheet.</p>
+        
+        <div id="appsScriptGuide" class="hidden mt-2 space-y-2">
+          <div class="text-[10px] text-slate-300 space-y-1 bg-surface-950 p-2.5 rounded-lg border border-slate-800">
+            <p class="font-medium text-white">How to enable Sheet sync on phone:</p>
+            <ol class="list-decimal list-inside space-y-0.5 text-slate-400">
+              <li>In your Google Sheet, click <strong class="text-slate-200">Extensions > Apps Script</strong></li>
+              <li>Replace <strong class="text-slate-200">Code.gs</strong> with the code below</li>
+              <li>Click <strong class="text-slate-200">Deploy > Manage deployments > Edit > New version > Deploy</strong></li>
+            </ol>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-slate-500 font-mono">Code.gs</span>
+            <button type="button" onclick="copyAppsScriptCode()" id="copyCodeBtn" class="text-[10px] bg-brand-500/20 text-brand-400 border border-brand-500/40 px-2 py-0.5 rounded hover:bg-brand-500/30 transition">
+              Copy Code
+            </button>
+          </div>
+          <textarea id="appsScriptCodeBlock" readonly class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-[10px] text-slate-300 font-mono h-28 resize-none focus:outline-none"></textarea>
+        </div>
+      </div>
+
       <div class="pt-2 flex justify-end gap-2 border-t border-slate-800/60">
         <button onclick="toggleSettingsModal(false)" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white rounded-lg transition">Cancel</button>
         <button onclick="saveConfiguration()" class="px-4 py-1.5 text-xs bg-brand-500 hover:bg-brand-600 font-semibold text-surface-950 rounded-lg transition">Save Settings</button>
@@ -267,6 +379,7 @@
       { name: "Maria Goretti", address: "Maria Goretti Catholic School, 21 Tabor Rd, Scarborough, ON" }
     ];
 
+    let currentOrigin = null; // null = default home, or { name: string, address: string }
     let currentStops = [];
     let isSubmitting = false;
     let searchDebounceTimer = null;
@@ -277,19 +390,57 @@
     // -------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
       loadSettings();
+      renderOriginUI();
       renderFrequentChips();
       renderStops();
-      renderRecentDrives();
+      renderRecentDrives(); // renders cached trips immediately
       updateOfflineQueueBadge();
       setupSearchListener();
+      setupOriginInputListener();
       setTripDateToToday();
+      populateAppsScriptCodeBlock();
+
+      // Mirror live sheet data in background
+      syncWithGoogleSheet(false);
 
       window.addEventListener("online", () => {
         updateConnectionStatus(true);
         flushOfflineQueue();
+        syncWithGoogleSheet(false);
       });
       window.addEventListener("offline", () => updateConnectionStatus(false));
     });
+
+    function getDefaultHomeAddress() {
+      return localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
+    }
+
+    function getActiveOriginAddress() {
+      return currentOrigin ? currentOrigin.address : getDefaultHomeAddress();
+    }
+
+    function getActiveOriginName() {
+      return currentOrigin ? currentOrigin.name : "Home";
+    }
+
+    function loadSettings() {
+      const home = getDefaultHomeAddress();
+      const url = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+      document.getElementById("configHomeInput").value = home;
+      document.getElementById("configScriptUrlInput").value = url;
+      renderOriginUI();
+    }
+
+    function saveConfiguration() {
+      const home = document.getElementById("configHomeInput").value.trim();
+      const url = document.getElementById("configScriptUrlInput").value.trim();
+      if (home) localStorage.setItem("driving_log_home", home);
+      if (url) localStorage.setItem("driving_log_script_url", url);
+      loadSettings();
+      toggleSettingsModal(false);
+      showAlert("Settings saved.", "success");
+      syncWithGoogleSheet(true);
+    }
 
     function getTodayDateString() {
       const now = new Date();
@@ -306,22 +457,86 @@
       }
     }
 
-    function loadSettings() {
-      const home = localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
-      const url = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
-      document.getElementById("originDisplay").innerText = `Home — ${home}`;
-      document.getElementById("configHomeInput").value = home;
-      document.getElementById("configScriptUrlInput").value = url;
+    // -------------------------------------------------------------
+    // ORIGIN / STARTING POINT LOGIC
+    // -------------------------------------------------------------
+    function renderOriginUI() {
+      const displayEl = document.getElementById("originDisplay");
+      const badgeEl = document.getElementById("originBadge");
+      const resetBtn = document.getElementById("resetOriginBtn");
+      const returnLabel = document.getElementById("returnLabel");
+      const returnSubtext = document.getElementById("returnSubtext");
+      const defaultHome = getDefaultHomeAddress();
+
+      if (currentOrigin) {
+        displayEl.innerText = `${currentOrigin.name} — ${currentOrigin.address}`;
+        badgeEl.innerText = "Custom Start";
+        badgeEl.className = "text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium";
+        resetBtn.classList.remove("hidden");
+        returnLabel.innerText = "Return to Start Point";
+        const shortName = currentOrigin.name || currentOrigin.address.split(",")[0];
+        returnSubtext.innerText = `Adds return leg back to ${shortName}`;
+      } else {
+        displayEl.innerText = `Home — ${defaultHome}`;
+        badgeEl.innerText = "Default Home";
+        badgeEl.className = "text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium";
+        resetBtn.classList.add("hidden");
+        returnLabel.innerText = "Return to Home";
+        returnSubtext.innerText = "Adds return leg back to Scarborough";
+      }
     }
 
-    function saveConfiguration() {
-      const home = document.getElementById("configHomeInput").value.trim();
-      const url = document.getElementById("configScriptUrlInput").value.trim();
-      if (home) localStorage.setItem("driving_log_home", home);
-      if (url) localStorage.setItem("driving_log_script_url", url);
-      loadSettings();
-      toggleSettingsModal(false);
-      showAlert("Settings saved.", "success");
+    function toggleOriginEdit(forceOpen) {
+      const section = document.getElementById("originEditSection");
+      const input = document.getElementById("originCustomInput");
+      const isOpen = !section.classList.contains("hidden");
+
+      if (forceOpen === true || !isOpen) {
+        section.classList.remove("hidden");
+        input.value = currentOrigin ? currentOrigin.address : "";
+        input.focus();
+      } else {
+        section.classList.add("hidden");
+      }
+    }
+
+    function setupOriginInputListener() {
+      const input = document.getElementById("originCustomInput");
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          applyCustomOriginFromInput();
+        }
+      });
+    }
+
+    function applyCustomOriginFromInput() {
+      const input = document.getElementById("originCustomInput");
+      const val = input.value.trim();
+      if (!val) {
+        showAlert("Please enter a starting address.", "warning");
+        return;
+      }
+      setOriginLocation(val.split(",")[0].trim(), val);
+    }
+
+    function setOriginLocation(name, address) {
+      const defaultHome = getDefaultHomeAddress();
+      if (address.trim() === defaultHome.trim()) {
+        currentOrigin = null;
+      } else {
+        currentOrigin = { name: name || "Custom Start", address: address.trim() };
+      }
+      renderOriginUI();
+      toggleOriginEdit(false);
+      showAlert(`Starting point set to: ${name || address}`, "info");
+    }
+
+    function resetOriginToHome() {
+      currentOrigin = null;
+      renderOriginUI();
+      toggleOriginEdit(false);
+      showAlert("Starting point reset to default home.", "info");
     }
 
     // -------------------------------------------------------------
@@ -406,22 +621,45 @@
 
       if (combined.length === 0) {
         resultsContainer.innerHTML = `
-          <div onclick="addStop('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" class="p-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between transition">
-            <div>
-              <div class="font-medium text-white">${query}</div>
-              <div class="text-[11px] text-slate-400">Add with default Toronto, ON bias</div>
+          <div class="p-2.5 px-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between transition">
+            <div onclick="addStop('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" class="flex-1 min-w-0 pr-2">
+              <div class="font-medium text-white truncate">${query}</div>
+              <div class="text-[11px] text-slate-400">Add stop with Toronto, ON bias</div>
             </div>
-            <span class="text-brand-500 font-bold">+</span>
+            <button 
+              type="button" 
+              onclick="event.stopPropagation(); setOriginLocation('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" 
+              class="text-[10px] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/40 px-1.5 py-0.5 rounded transition shrink-0"
+            >
+              Set Start
+            </button>
           </div>
         `;
       } else {
         resultsContainer.innerHTML = combined.map(item => `
-          <div onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" class="p-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between transition">
-            <div class="min-w-0 pr-2">
+          <div class="p-2.5 px-3 text-xs text-slate-300 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between transition group">
+            <div onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" class="min-w-0 pr-2 flex-1">
               <div class="font-medium text-white truncate">${item.name}</div>
               <div class="text-[11px] text-slate-400 truncate">${item.address}</div>
             </div>
-            <span class="text-brand-500 font-bold shrink-0">+</span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button 
+                type="button" 
+                onclick="event.stopPropagation(); setOriginLocation('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" 
+                class="text-[10px] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/40 px-1.5 py-0.5 rounded transition"
+                title="Use as starting point for this trip"
+              >
+                Set Start
+              </button>
+              <button 
+                type="button" 
+                onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" 
+                class="w-6 h-6 rounded bg-brand-500/10 hover:bg-brand-500/20 text-brand-500 font-bold flex items-center justify-center transition"
+                title="Add stop"
+              >
+                +
+              </button>
+            </div>
           </div>
         `).join("");
       }
@@ -495,12 +733,71 @@
     }
 
     // -------------------------------------------------------------
+    // LIVE GOOGLE SHEET 2-WAY SYNCHRONIZATION
+    // -------------------------------------------------------------
+    async function syncWithGoogleSheet(showFeedback = false) {
+      const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+      const statusEl = document.getElementById("connectionStatus");
+      const spinIcon = document.getElementById("syncSpinIcon");
+      const syncBanner = document.getElementById("sheetSyncBanner");
+
+      if (!navigator.onLine) {
+        updateConnectionStatus(false);
+        if (showFeedback) showAlert("You are offline. Showing cached drives.", "warning");
+        return;
+      }
+
+      if (spinIcon) spinIcon.classList.add("animate-spin");
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> Syncing Sheet...`;
+      }
+
+      try {
+        const res = await fetch(scriptUrl, {
+          method: "GET",
+          headers: { "Accept": "application/json" },
+          cache: "no-store",
+          priority: "low"
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        if (data.status === "success" && Array.isArray(data.trips)) {
+          // Google Sheet is the single source of truth! Cache locally on this device
+          localStorage.setItem("driving_log_history", JSON.stringify(data.trips.slice(0, 50)));
+          renderRecentDrives(data.trips, data.totalKm);
+          updateConnectionStatus(true, "Sheet Synced");
+          if (syncBanner) syncBanner.classList.add("hidden");
+          if (showFeedback) showAlert(`✓ Synced ${data.trips.length} drives from Google Sheet!`, "success");
+        } else if (data.status === "healthy" && !data.trips) {
+          // Running write-only template without doGet implementation
+          updateConnectionStatus(true, "Sheet Connected");
+          if (syncBanner) syncBanner.classList.remove("hidden");
+          if (showFeedback) showAlert("Sheet connected! Update Apps Script Code.gs to mirror past drives on mobile.", "warning");
+        } else {
+          updateConnectionStatus(true, "Sheets Live");
+        }
+      } catch (err) {
+        console.warn("Sheet sync error:", err);
+        updateConnectionStatus(navigator.onLine, navigator.onLine ? "Sync Dropped" : "Offline Mode");
+        if (showFeedback) showAlert("Unable to sync from Google Sheet. Check network or script URL.", "warning");
+      } finally {
+        if (spinIcon) spinIcon.classList.remove("animate-spin");
+      }
+    }
+
+    // -------------------------------------------------------------
     // RECORD & DISPATCH TO GOOGLE SHEETS
     // -------------------------------------------------------------
     async function recordAndSyncDrive() {
       if (isSubmitting) return;
 
-      const home = localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
+      const originAddr = getActiveOriginAddress();
+      const originName = getActiveOriginName();
       const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
       const isReturn = document.getElementById("returnHomeToggle").checked;
       const note = document.getElementById("tripNoteInput").value.trim() || "School Visit Circuit";
@@ -511,13 +808,13 @@
         return;
       }
 
-      const routeAddresses = [home];
+      const routeAddresses = [originAddr];
       currentStops.forEach(s => routeAddresses.push(s.address));
-      if (isReturn) routeAddresses.push(home);
+      if (isReturn) routeAddresses.push(originAddr);
 
       setSubmittingState(true);
 
-      // Preserve the chosen trip date in local time for timestamp calculation
+      // Preserve chosen date in local time
       const now = new Date();
       let tripTimestamp;
       if (selectedDate) {
@@ -535,6 +832,8 @@
         timestamp: tripTimestamp
       };
 
+      const fullRouteSummary = `${originName} → ${currentStops.map(s => s.name).join(" → ")}${isReturn ? ` → ${originName}` : ''}`;
+
       try {
         const response = await fetch(scriptUrl, {
           method: "POST",
@@ -549,11 +848,13 @@
             tripId: data.tripId || "SYNCED",
             date: selectedDate,
             km: data.totalKm,
-            stops: currentStops.map(s => s.name).join(" → "),
+            stops: fullRouteSummary,
             synced: true
           });
           showAlert(`✓ Logged ${data.totalKm} KM to Google Sheets! (${data.tripId || 'Saved'})`, "success");
           resetTripForm();
+          // Trigger immediate sync from Google Sheet to ensure all devices match
+          syncWithGoogleSheet(false);
         } else {
           throw new Error(data.error || "Server rejected route calculation.");
         }
@@ -565,7 +866,7 @@
           tripId: "OFFLINE",
           date: selectedDate,
           km: 0,
-          stops: currentStops.map(s => s.name).join(" → "),
+          stops: fullRouteSummary,
           synced: false
         });
         showAlert("Offline: Drive saved locally. Will sync to Sheets when connection resumes.", "warning");
@@ -634,6 +935,7 @@
 
       if (remaining.length === 0) {
         showAlert("All offline drives synced to Google Sheets!", "success");
+        syncWithGoogleSheet(false);
       }
     }
 
@@ -656,33 +958,41 @@
     function saveToRecentHistory(entry) {
       const history = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
       history.unshift(entry);
-      localStorage.setItem("driving_log_history", JSON.stringify(history.slice(0, 10)));
+      localStorage.setItem("driving_log_history", JSON.stringify(history.slice(0, 50)));
       renderRecentDrives();
     }
 
-    function renderRecentDrives() {
-      const history = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
+    function renderRecentDrives(trips = null, totalKmOverride = null) {
+      const history = trips || JSON.parse(localStorage.getItem("driving_log_history") || "[]");
       const feed = document.getElementById("recentDrivesFeed");
       const totalDisplay = document.getElementById("sessionTotalKm");
 
-      const totalKm = history.reduce((acc, h) => acc + (Number(h.km) || 0), 0);
+      const totalKm = totalKmOverride !== null 
+        ? totalKmOverride 
+        : history.reduce((acc, h) => acc + (Number(h.km) || 0), 0);
+
       totalDisplay.innerText = `${totalKm.toFixed(1)} KM Logged`;
 
       if (history.length === 0) {
-        feed.innerHTML = `<div class="text-[11px] text-slate-500 py-2">No drives logged yet today.</div>`;
+        feed.innerHTML = `
+          <div class="bg-surface-900 border border-slate-800 rounded-xl p-3 text-center">
+            <p class="text-xs text-slate-400">No drives logged yet</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">Drives will mirror from your Google Sheet here.</p>
+          </div>
+        `;
         return;
       }
 
-      feed.innerHTML = history.slice(0, 4).map(h => `
+      feed.innerHTML = history.slice(0, 6).map(h => `
         <div class="bg-surface-900 border border-slate-800 rounded-xl p-2.5 px-3 flex items-center justify-between shadow-sm">
           <div class="min-w-0 pr-3">
-            <div class="text-xs font-medium text-white truncate">${h.stops}</div>
+            <div class="text-xs font-medium text-white truncate">${h.stops || h.notes || 'Trip'}</div>
             <div class="text-[10px] text-slate-400">
-              ${h.date} • ${h.synced ? '<span class="text-emerald-400">Synced ✓</span>' : '<span class="text-amber-400">Saved Offline</span>'}
+              ${h.date || (h.timestamp ? String(h.timestamp).slice(0, 10) : '')} • ${h.synced !== false ? '<span class="text-emerald-400">Synced ✓</span>' : '<span class="text-amber-400">Saved Offline</span>'}
               ${h.tripId && h.tripId !== 'OFFLINE' ? `<span class="ml-1 text-[9px] text-slate-500 font-mono">(${h.tripId})</span>` : ''}
             </div>
           </div>
-          <div class="text-sm font-bold text-white shrink-0">${h.km > 0 ? `${h.km} km` : '—'}</div>
+          <div class="text-sm font-bold text-white shrink-0">${Number(h.km) > 0 ? `${Number(h.km).toFixed(1)} km` : '—'}</div>
         </div>
       `).join("");
     }
@@ -723,19 +1033,79 @@
       banner.classList.add("hidden");
     }
 
-    function updateConnectionStatus(isOnline) {
+    function updateConnectionStatus(isOnline, labelText = null) {
       const el = document.getElementById("connectionStatus");
-      if (isOnline) {
-        el.className = "text-[11px] text-emerald-400 font-medium flex items-center gap-1";
-        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Sheets Live`;
-      } else {
+      if (!isOnline) {
         el.className = "text-[11px] text-amber-400 font-medium flex items-center gap-1";
         el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Offline Mode`;
+      } else {
+        el.className = "text-[11px] text-emerald-400 font-medium flex items-center gap-1";
+        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ${labelText || 'Sheets Live'}`;
       }
     }
 
     function toggleSettingsModal(show) {
       document.getElementById("settingsModal").classList.toggle("hidden", !show);
+    }
+
+    function toggleAppsScriptGuide(forceOpen) {
+      const guide = document.getElementById("appsScriptGuide");
+      const btnText = document.getElementById("guideToggleText");
+      const isOpen = !guide.classList.contains("hidden");
+
+      if (forceOpen === true || !isOpen) {
+        guide.classList.remove("hidden");
+        btnText.innerText = "Hide Code";
+      } else {
+        guide.classList.add("hidden");
+        btnText.innerText = "View Code.gs";
+      }
+    }
+
+    const APPS_SCRIPT_SOURCE = `function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName("Trips") || ss.getSheets()[0];
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: 0, trips: [] })).setMimeType(ContentService.MimeType.JSON);
+    }
+    const headers = data[0].map(h => String(h || "").trim().toLowerCase());
+    let dateIdx = headers.findIndex(h => h === "date" || h.includes("trip date"));
+    let kmIdx = headers.findIndex(h => h.includes("km") || h.includes("distance"));
+    let stopsIdx = headers.findIndex(h => h.includes("stop") || h.includes("route"));
+    let notesIdx = headers.findIndex(h => h.includes("note") || h.includes("purpose"));
+    let idIdx = headers.findIndex(h => h.includes("id"));
+    if (dateIdx === -1) dateIdx = 1; if (kmIdx === -1) kmIdx = 2; if (stopsIdx === -1) stopsIdx = 3;
+    const trips = []; let totalKm = 0;
+    for (let i = data.length - 1; i >= 1; i--) {
+      const row = data[i]; if (!row || !row[0]) continue;
+      const kmVal = Number(row[kmIdx]) || 0; totalKm += kmVal;
+      let rawDate = row[dateIdx] || row[0]; let formattedDate = rawDate instanceof Date ? Utilities.formatDate(rawDate, "America/Toronto", "yyyy-MM-dd") : String(rawDate).slice(0, 10);
+      trips.push({ tripId: String(row[idIdx] || 'SYNCED'), date: formattedDate, km: Number(kmVal.toFixed(1)), stops: String(row[stopsIdx] || ""), notes: String(row[notesIdx] || ""), synced: true });
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: Number(totalKm.toFixed(1)), trips: trips })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+
+    function populateAppsScriptCodeBlock() {
+      const textarea = document.getElementById("appsScriptCodeBlock");
+      if (textarea) textarea.value = APPS_SCRIPT_SOURCE;
+    }
+
+    function copyAppsScriptCode() {
+      const code = document.getElementById("appsScriptCodeBlock").value;
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = document.getElementById("copyCodeBtn");
+        btn.innerText = "✓ Copied!";
+        btn.classList.add("text-emerald-400", "border-emerald-500/50");
+        setTimeout(() => {
+          btn.innerText = "Copy Code";
+          btn.classList.remove("text-emerald-400", "border-emerald-500/50");
+        }, 2000);
+      });
     }
   </script>
 </body>
