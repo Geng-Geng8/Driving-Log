@@ -791,6 +791,81 @@
     }
 
     // -------------------------------------------------------------
+    // ROUTE SUMMARY & DISPLAY FORMATTING
+    // -------------------------------------------------------------
+    function buildRouteSummary() {
+      if (currentStops.length === 0) return "No stops";
+
+      const stopNames = currentStops.map(s => {
+        let name = s.name.trim();
+        return name.replace(/^Home\s*[-—:]*\s*/i, "").trim();
+      });
+
+      const parts = [];
+
+      // If started from custom location (not Home Base), show starting point
+      if (currentOrigin) {
+        parts.push(currentOrigin.name || currentOrigin.address.split(",")[0].trim());
+      }
+
+      // Add all destinations (first trip of the day is parts[0]!)
+      parts.push(...stopNames);
+
+      // If return is enabled, add destination (Home or return start)
+      const isReturn = document.getElementById("returnHomeToggle").checked;
+      if (isReturn) {
+        parts.push(currentOrigin ? (currentOrigin.name || "Start") : "Home");
+      }
+
+      return parts.join(" → ");
+    }
+
+    function cleanRouteForDisplay(routeStr) {
+      if (!routeStr) return "Trip";
+      let route = String(routeStr).trim();
+
+      // Strip leading home address or "Home -"
+      route = route.replace(/^Home\s*[-—:]*\s*/i, "");
+      route = route.replace(/^74\s*Dalmatian\s*(Cres|Crescent)?[^→\->,]*/i, "").trim();
+      route = route.replace(/^(\s*[-—→>]+\s*|\s*to\s*)/i, "").trim();
+
+      // Replace trailing home address with "Home"
+      route = route.replace(/74\s*Dalmatian\s*(Cres|Crescent)?[^→\->,]*/i, "Home").trim();
+      route = route.replace(/Home\s*[-—:]*\s*74\s*Dalmatian[^→\->,]*/i, "Home").trim();
+
+      // Clean double arrows
+      route = route.replace(/\s*[-—→>]+\s*[-—→>]+\s*/g, " → ");
+      route = route.replace(/^[-—→>\s]+|[-—→>\s]+$/g, "").trim();
+
+      return route || "Home Circuit";
+    }
+
+    function renderRouteHtml(routeStr) {
+      const cleaned = cleanRouteForDisplay(routeStr);
+      // Split on arrow or 'to'
+      const parts = cleaned.split(/\s*[-—→>]+\s*|\s+to\s+/i).filter(Boolean);
+
+      if (parts.length <= 1) {
+        return `<span class="text-white font-medium">${cleaned}</span>`;
+      }
+
+      return parts.map((part, index) => {
+        const isLast = index === parts.length - 1;
+        const isHome = part.toLowerCase() === "home";
+
+        const badgeHtml = isHome
+          ? `<span class="text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px]">Home</span>`
+          : `<span class="text-slate-100 font-medium">${part}</span>`;
+
+        if (isLast) {
+          return badgeHtml;
+        }
+
+        return `${badgeHtml} <span class="text-brand-500 font-bold text-[10px]">→</span>`;
+      }).join(" ");
+    }
+
+    // -------------------------------------------------------------
     // RECORD & DISPATCH TO GOOGLE SHEETS
     // -------------------------------------------------------------
     async function recordAndSyncDrive() {
@@ -825,14 +900,16 @@
         tripTimestamp = now.toISOString();
       }
 
+      // Generate destination route starting with first trip of day (e.g. "Madonna CSS → Agatha → Home")
+      const routeSummary = buildRouteSummary();
+
       const payload = {
-        stops: routeAddresses,
+        stops: routeAddresses,        // Full addresses for Maps API distance calculation
+        routeSummary: routeSummary,   // Clean destination summary for Column D!
         notes: note,
         date: selectedDate,
         timestamp: tripTimestamp
       };
-
-      const fullRouteSummary = `${originName} → ${currentStops.map(s => s.name).join(" → ")}${isReturn ? ` → ${originName}` : ''}`;
 
       try {
         const response = await fetch(scriptUrl, {
@@ -848,7 +925,8 @@
             tripId: data.tripId || "SYNCED",
             date: selectedDate,
             km: data.totalKm,
-            stops: fullRouteSummary,
+            stops: routeSummary,
+            notes: note,
             synced: true
           });
           showAlert(`✓ Logged ${data.totalKm} KM to Google Sheets! (${data.tripId || 'Saved'})`, "success");
@@ -866,7 +944,8 @@
           tripId: "OFFLINE",
           date: selectedDate,
           km: 0,
-          stops: fullRouteSummary,
+          stops: routeSummary,
+          notes: note,
           synced: false
         });
         showAlert("Offline: Drive saved locally. Will sync to Sheets when connection resumes.", "warning");
@@ -983,18 +1062,35 @@
         return;
       }
 
-      feed.innerHTML = history.slice(0, 6).map(h => `
-        <div class="bg-surface-900 border border-slate-800 rounded-xl p-2.5 px-3 flex items-center justify-between shadow-sm">
-          <div class="min-w-0 pr-3">
-            <div class="text-xs font-medium text-white truncate">${h.stops || h.notes || 'Trip'}</div>
-            <div class="text-[10px] text-slate-400">
-              ${h.date || (h.timestamp ? String(h.timestamp).slice(0, 10) : '')} • ${h.synced !== false ? '<span class="text-emerald-400">Synced ✓</span>' : '<span class="text-amber-400">Saved Offline</span>'}
-              ${h.tripId && h.tripId !== 'OFFLINE' ? `<span class="ml-1 text-[9px] text-slate-500 font-mono">(${h.tripId})</span>` : ''}
+      feed.innerHTML = history.slice(0, 8).map(h => {
+        const rawRoute = h.stops || h.route || h.notes || "Trip";
+        const routeHtml = renderRouteHtml(rawRoute);
+        const formattedKm = Number(h.km) > 0 ? `${Number(h.km).toFixed(1)} km` : "—";
+        const dateStr = h.date || (h.timestamp ? String(h.timestamp).slice(0, 10) : "");
+
+        return `
+          <div class="bg-surface-900 border border-slate-800/90 rounded-xl p-3 space-y-2 shadow-sm">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-semibold text-white leading-snug flex items-center flex-wrap gap-1">
+                  ${routeHtml}
+                </div>
+              </div>
+              <div class="text-sm font-bold text-white shrink-0">${formattedKm}</div>
+            </div>
+            <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60">
+              <div class="flex items-center gap-1.5 truncate">
+                <span>${dateStr}</span>
+                ${h.notes ? `<span>•</span> <span class="text-slate-300 font-medium truncate">${h.notes}</span>` : ""}
+              </div>
+              <div class="shrink-0 flex items-center gap-1.5">
+                ${h.synced !== false ? '<span class="text-emerald-400 text-[10px] font-medium flex items-center gap-0.5"><svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Synced</span>' : '<span class="text-amber-400 text-[10px]">Saved Offline</span>'}
+                ${h.tripId && h.tripId !== 'OFFLINE' ? `<span class="text-[9px] text-slate-500 font-mono">(${h.tripId})</span>` : ''}
+              </div>
             </div>
           </div>
-          <div class="text-sm font-bold text-white shrink-0">${Number(h.km) > 0 ? `${Number(h.km).toFixed(1)} km` : '—'}</div>
-        </div>
-      `).join("");
+        `;
+      }).join("");
     }
 
     function showAlert(msg, type = "info") {
@@ -1062,37 +1158,93 @@
       }
     }
 
-    const APPS_SCRIPT_SOURCE = `function doGet(e) {
+    const APPS_SCRIPT_SOURCE = `// Full Google Apps Script code is available in GoogleAppsScript_Code.gs
+// Handles: A: Trip ID | B: Date | C: Notes | D: Route | E: Stops | F: Total KM
+// Features: Automatic distance calculation, live doGet reading, clean route summaries without home prefix, and cleanExistingRoutesInSheet().
+// See the project's GoogleAppsScript_Code.gs file for the full deployable code.`;
+
+    function populateAppsScriptCodeBlock() {
+      const textarea = document.getElementById("appsScriptCodeBlock");
+      if (textarea) {
+        textarea.value = `// Paste this in Google Sheets > Extensions > Apps Script (Code.gs)
+// It mirrors your exact sheet columns: A: Trip ID | B: Date | C: Notes | D: Route | E: Stops | F: Total KM
+
+const SHEET_NAME = "Trips";
+
+function doGet(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName("Trips") || ss.getSheets()[0];
+    let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
     const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: 0, trips: [] })).setMimeType(ContentService.MimeType.JSON);
-    }
+    if (data.length <= 1) return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: 0, trips: [] })).setMimeType(ContentService.MimeType.JSON);
+
     const headers = data[0].map(h => String(h || "").trim().toLowerCase());
-    let dateIdx = headers.findIndex(h => h === "date" || h.includes("trip date"));
-    let kmIdx = headers.findIndex(h => h.includes("km") || h.includes("distance"));
-    let stopsIdx = headers.findIndex(h => h.includes("stop") || h.includes("route"));
-    let notesIdx = headers.findIndex(h => h.includes("note") || h.includes("purpose"));
-    let idIdx = headers.findIndex(h => h.includes("id"));
-    if (dateIdx === -1) dateIdx = 1; if (kmIdx === -1) kmIdx = 2; if (stopsIdx === -1) stopsIdx = 3;
+    let idIdx = headers.findIndex(h => h.includes("trip id") || h === "id"); if (idIdx === -1) idIdx = 0;
+    let dateIdx = headers.findIndex(h => h === "date"); if (dateIdx === -1) dateIdx = 1;
+    let notesIdx = headers.findIndex(h => h.includes("note")); if (notesIdx === -1) notesIdx = 2;
+    let routeIdx = headers.findIndex(h => h.includes("route")); if (routeIdx === -1) routeIdx = 3;
+    let stopsIdx = headers.findIndex(h => h === "stops"); if (stopsIdx === -1) stopsIdx = 4;
+    let kmIdx = headers.findIndex(h => h.includes("km")); if (kmIdx === -1) kmIdx = 5;
+
     const trips = []; let totalKm = 0;
     for (let i = data.length - 1; i >= 1; i--) {
       const row = data[i]; if (!row || !row[0]) continue;
       const kmVal = Number(row[kmIdx]) || 0; totalKm += kmVal;
-      let rawDate = row[dateIdx] || row[0]; let formattedDate = rawDate instanceof Date ? Utilities.formatDate(rawDate, "America/Toronto", "yyyy-MM-dd") : String(rawDate).slice(0, 10);
-      trips.push({ tripId: String(row[idIdx] || 'SYNCED'), date: formattedDate, km: Number(kmVal.toFixed(1)), stops: String(row[stopsIdx] || ""), notes: String(row[notesIdx] || ""), synced: true });
+      let rawDate = row[dateIdx];
+      let formattedDate = rawDate instanceof Date ? Utilities.formatDate(rawDate, "America/Toronto", "yyyy-MM-dd") : String(rawDate).slice(0, 10);
+      let cleanRoute = cleanRouteString(String(row[routeIdx] || ""));
+      trips.push({ tripId: String(row[idIdx] || 'SYNCED'), date: formattedDate, notes: String(row[notesIdx] || ""), route: cleanRoute, stops: cleanRoute, km: Number(kmVal.toFixed(1)), synced: true });
     }
     return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: Number(totalKm.toFixed(1)), trips: trips })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
-}`;
+}
 
-    function populateAppsScriptCodeBlock() {
-      const textarea = document.getElementById("appsScriptCodeBlock");
-      if (textarea) textarea.value = APPS_SCRIPT_SOURCE;
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const stops = payload.stops;
+    const notes = payload.notes || "Trip";
+    const chosenDate = payload.date || new Date().toISOString().slice(0, 10);
+    const routeSummary = payload.routeSummary || buildRouteSummaryFromStops(stops);
+    const stopsCount = stops.length;
+
+    let totalMeters = 0;
+    for (let i = 0; i < stops.length - 1; i++) {
+      const directions = Maps.newDirectionFinder().setOrigin(stops[i]).setDestination(stops[i+1]).setMode(Maps.DirectionFinder.Mode.DRIVING).getDirections();
+      if (directions.status === "OK" && directions.routes.length > 0) {
+        for (let j = 0; j < directions.routes[0].legs.length; j++) totalMeters += directions.routes[0].legs[j].distance.value;
+      }
+    }
+    const totalKm = Number((totalMeters / 1000).toFixed(1));
+    const tripId = "TRIP-" + chosenDate.replace(/-/g, "") + "-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+
+    // Matches your exact columns: A: Trip ID | B: Date | C: Notes | D: Route | E: Stops | F: Total KM
+    sheet.appendRow([tripId, chosenDate, notes, routeSummary, stopsCount, totalKm]);
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, tripId: tripId, totalKm: totalKm, route: routeSummary })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function cleanRouteString(r) {
+  return r.replace(/^Home\\s*[-—:]*\\s*/i, "").replace(/^74\\s*Dalmatian[^→\\->,]*/i, "").replace(/^(\\s*[-—→>]+\\s*|\\s*to\\s*)/i, "").replace(/74\\s*Dalmatian[^→\\->,]*/i, "Home").replace(/\\s*[-—→>]+\\s*[-—→>]+\\s*/g, " → ").trim() || "Home Circuit";
+}
+
+function cleanExistingRoutesInSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    let r = String(data[i][3] || "");
+    if (r) sheet.getRange(i + 1, 4).setValue(cleanRouteString(r));
+  }
+}`;
+      }
     }
 
     function copyAppsScriptCode() {
