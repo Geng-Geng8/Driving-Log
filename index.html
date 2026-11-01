@@ -55,7 +55,10 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
         </div>
         <div>
-          <h1 class="text-sm font-semibold tracking-tight text-white leading-tight">Trip Log</h1>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-sm font-semibold tracking-tight text-white leading-tight">Trip Log</h1>
+            <span id="authStatusBadge" class="text-[9px] bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded font-medium flex items-center gap-1"></span>
+          </div>
           <p id="connectionStatus" class="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Sheets Live
           </p>
@@ -290,7 +293,7 @@
   </main>
 
   <!-- Sticky Bottom Submission Bar -->
-  <footer class="fixed bottom-0 inset-x-0 bg-surface-950/95 backdrop-blur-lg border-t border-slate-800 p-3.5 z-40">
+  <footer class="fixed bottom-0 inset-x-0 bg-surface-950/95 backdrop-blur-lg border-t border-slate-800 p-3.5 z-40" onclick="handleFooterClick(event)">
     <div class="max-w-md mx-auto">
       <button 
         id="submitDriveBtn" 
@@ -312,14 +315,21 @@
         <h3 class="text-sm font-semibold text-white">App Configuration</h3>
         <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white p-1" aria-label="Close modal">✕</button>
       </div>
+
+      <!-- Magic Link / Authorization Notice Card -->
+      <div id="modalAuthNotice"></div>
+
       <div class="space-y-3 text-xs">
         <div>
           <label class="block text-slate-400 mb-1">Default Home Base (Scarborough)</label>
           <input type="text" id="configHomeInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:ring-1 focus:ring-brand-500">
         </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Google Apps Script Endpoint</label>
-          <input type="text" id="configScriptUrlInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-brand-500">
+        <div id="configEndpointWrapper">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-slate-400">Google Apps Script Endpoint</label>
+            <span id="endpointLockNotice" class="text-[10px] text-amber-400 font-medium"></span>
+          </div>
+          <input type="text" id="configScriptUrlInput" class="w-full bg-surface-950 border border-slate-800 rounded-lg p-2 text-white text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 transition">
         </div>
       </div>
 
@@ -354,7 +364,7 @@
 
       <div class="pt-2 flex justify-end gap-2 border-t border-slate-800/60">
         <button onclick="toggleSettingsModal(false)" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white rounded-lg transition">Cancel</button>
-        <button onclick="saveConfiguration()" class="px-4 py-1.5 text-xs bg-brand-500 hover:bg-brand-600 font-semibold text-surface-950 rounded-lg transition">Save Settings</button>
+        <button id="saveSettingsBtn" onclick="saveConfiguration()" class="px-4 py-1.5 text-xs bg-brand-500 hover:bg-brand-600 font-semibold text-surface-950 rounded-lg transition">Save Settings</button>
       </div>
     </div>
   </div>
@@ -386,9 +396,11 @@
     let alertDismissTimer = null;
 
     // -------------------------------------------------------------
-    // INITIALIZATION
+    // INITIALIZATION & AUTHORIZATION
     // -------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
+      checkMagicLinkAuthorization();
+      applyAuthorizationState();
       loadSettings();
       renderOriginUI();
       renderFrequentChips();
@@ -411,6 +423,141 @@
       window.addEventListener("offline", () => updateConnectionStatus(false));
     });
 
+    // -------------------------------------------------------------
+    // MAGIC LINK & ACCESS CONTROL
+    // -------------------------------------------------------------
+    function checkMagicLinkAuthorization() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const key = urlParams.get("key");
+
+      if (key && key.trim()) {
+        const cleanKey = key.trim();
+        localStorage.setItem("driving_log_secret", cleanKey);
+        // Clean URL so the secret key isn't visible in the address bar
+        window.history.replaceState({}, document.title, window.location.pathname);
+        showAlert("Magic Link unlocked! Trip recording enabled.", "success");
+      }
+    }
+
+    function isAuthorized() {
+      const secret = localStorage.getItem("driving_log_secret");
+      return Boolean(secret && secret.trim());
+    }
+
+    function applyAuthorizationState() {
+      const authorized = isAuthorized();
+      const btn = document.getElementById("submitDriveBtn");
+      const btnText = document.getElementById("btnText");
+      const btnIcon = document.getElementById("btnIcon");
+      const authBadge = document.getElementById("authStatusBadge");
+      const endpointInput = document.getElementById("configScriptUrlInput");
+      const endpointLockNotice = document.getElementById("endpointLockNotice");
+      const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+      const modalNotice = document.getElementById("modalAuthNotice");
+
+      // 1. Header status badge
+      if (authBadge) {
+        if (authorized) {
+          authBadge.className = "text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-medium flex items-center gap-1";
+          authBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Owner`;
+          authBadge.title = "Authorized via Magic Link";
+        } else {
+          authBadge.className = "text-[9px] bg-slate-800 text-slate-400 border border-slate-700/60 px-1.5 py-0.5 rounded font-medium flex items-center gap-1";
+          authBadge.innerHTML = `<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> View-Only`;
+          authBadge.title = "View-Only Mode. Trip recording is locked.";
+        }
+      }
+
+      // 2. Submission CTA Button
+      if (btn && btnText && btnIcon) {
+        if (authorized) {
+          btn.disabled = false;
+          btn.className = "w-full bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-surface-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2 transition disabled:opacity-50 disabled:pointer-events-none";
+          btnText.innerText = "Record Circuit & Save to Sheet";
+          btnIcon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
+        } else {
+          btn.disabled = true;
+          btn.className = "w-full bg-slate-800/80 border border-slate-700/60 text-slate-400 font-semibold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 cursor-not-allowed select-none transition";
+          btnText.innerText = "🔒 View-Only Mode";
+          btnIcon.innerHTML = `<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>`;
+        }
+      }
+
+      // 3. Settings Modal Endpoint & Save Controls
+      if (endpointInput) {
+        endpointInput.disabled = !authorized;
+        endpointInput.readOnly = !authorized;
+        if (!authorized) {
+          endpointInput.classList.add("opacity-50", "cursor-not-allowed");
+          if (endpointLockNotice) endpointLockNotice.innerText = "🔒 Locked";
+        } else {
+          endpointInput.classList.remove("opacity-50", "cursor-not-allowed");
+          if (endpointLockNotice) endpointLockNotice.innerText = "";
+        }
+      }
+
+      if (saveSettingsBtn) {
+        saveSettingsBtn.classList.toggle("hidden", !authorized);
+      }
+
+      // 4. Modal Authorization Banner
+      if (modalNotice) {
+        if (authorized) {
+          modalNotice.innerHTML = `
+            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 text-xs flex items-center justify-between">
+              <div class="flex items-center gap-2 text-emerald-400 font-medium">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span>Owner Authorized</span>
+              </div>
+              <button type="button" onclick="revokeAuthorization()" class="text-[10px] text-slate-400 hover:text-rose-400 px-2 py-0.5 rounded border border-slate-700/60 hover:border-rose-500/40 transition">
+                Lock App
+              </button>
+            </div>
+          `;
+        } else {
+          modalNotice.innerHTML = `
+            <div class="bg-surface-950 border border-slate-800 rounded-xl p-3 text-xs space-y-2">
+              <div class="flex items-center gap-2 text-slate-300 font-medium">
+                <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <span>View-Only Mode</span>
+              </div>
+              <p class="text-[11px] text-slate-400 leading-relaxed">
+                Recording drives and endpoint changes are restricted to the owner. Access via your personal Magic Link (<code class="text-slate-300">?key=...</code>) or enter your secret key below:
+              </p>
+              <div class="flex items-center gap-2 pt-0.5">
+                <input type="password" id="manualSecretInput" placeholder="Enter secret key..." class="flex-1 bg-surface-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                <button type="button" onclick="unlockWithManualKey()" class="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-surface-950 font-semibold text-xs rounded-lg transition shrink-0">Unlock</button>
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function unlockWithManualKey() {
+      const input = document.getElementById("manualSecretInput");
+      const val = input ? input.value.trim() : "";
+      if (!val) {
+        showAlert("Please enter a secret key.", "warning");
+        return;
+      }
+      localStorage.setItem("driving_log_secret", val);
+      applyAuthorizationState();
+      showAlert("Magic Link secret saved! App unlocked.", "success");
+    }
+
+    function revokeAuthorization() {
+      localStorage.removeItem("driving_log_secret");
+      applyAuthorizationState();
+      showAlert("App locked in View-Only mode.", "info");
+    }
+
+    function handleFooterClick(e) {
+      if (!isAuthorized()) {
+        showAlert("🔒 View-Only Mode: Trip recording is locked. Use your Magic Link to authorize.", "warning");
+      }
+    }
+
     function getDefaultHomeAddress() {
       return localStorage.getItem("driving_log_home") || DEFAULT_CONFIG.homeAddress;
     }
@@ -429,9 +576,14 @@
       document.getElementById("configHomeInput").value = home;
       document.getElementById("configScriptUrlInput").value = url;
       renderOriginUI();
+      applyAuthorizationState();
     }
 
     function saveConfiguration() {
+      if (!isAuthorized()) {
+        showAlert("Unauthorized: Settings modification is locked in View-Only mode.", "warning");
+        return;
+      }
       const home = document.getElementById("configHomeInput").value.trim();
       const url = document.getElementById("configScriptUrlInput").value.trim();
       if (home) localStorage.setItem("driving_log_home", home);
@@ -933,6 +1085,11 @@
     async function recordAndSyncDrive() {
       if (isSubmitting) return;
 
+      if (!isAuthorized()) {
+        showAlert("🔒 View-Only Mode: Owner authorization required to record trips.", "warning");
+        return;
+      }
+
       const originAddr = getActiveOriginAddress();
       const originName = getActiveOriginName();
       const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
@@ -966,6 +1123,7 @@
       const routeSummary = buildRouteSummary();
 
       const payload = {
+        secret: localStorage.getItem("driving_log_secret") || "",
         stops: routeAddresses,        // Full addresses for Maps API distance calculation
         routeSummary: routeSummary,   // Clean destination summary for Column D!
         notes: note,
@@ -1030,13 +1188,12 @@
       const btnText = document.getElementById("btnText");
       const btnIcon = document.getElementById("btnIcon");
 
-      btn.disabled = active;
       if (active) {
+        btn.disabled = true;
         btnText.innerText = "Calculating & Logging Route...";
         btnIcon.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
       } else {
-        btnText.innerText = "Record Circuit & Save to Sheet";
-        btnIcon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
+        applyAuthorizationState();
       }
     }
 
@@ -1059,6 +1216,9 @@
 
       for (const item of queue) {
         try {
+          if (!item.secret) {
+            item.secret = localStorage.getItem("driving_log_secret") || "";
+          }
           const res = await fetch(scriptUrl, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -1266,6 +1426,13 @@ function doGet(e) {
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
+
+    // Optional secret verification: set Script Property "DRIVING_LOG_SECRET" in Apps Script to enforce
+    const expectedSecret = PropertiesService.getScriptProperties().getProperty("DRIVING_LOG_SECRET");
+    if (expectedSecret && payload.secret !== expectedSecret) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Unauthorized: Invalid secret key." })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     const stops = payload.stops;
     const notes = payload.notes || "Trip";
     const chosenDate = payload.date || new Date().toISOString().slice(0, 10);

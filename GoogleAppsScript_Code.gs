@@ -141,6 +141,18 @@ function doPost(e) {
     }
 
     const payload = JSON.parse(rawContent);
+
+    // Optional server-side secret validation:
+    // If you set a Script Property named "DRIVING_LOG_SECRET" in Apps Script Project Settings,
+    // only submissions with a matching secret will be accepted.
+    const expectedSecret = PropertiesService.getScriptProperties().getProperty("DRIVING_LOG_SECRET");
+    if (expectedSecret && payload.secret !== expectedSecret) {
+      return createJsonResponse({
+        success: false,
+        error: "Unauthorized: Invalid or missing secret key."
+      });
+    }
+
     const stops = payload.stops;
 
     if (!stops || !Array.isArray(stops) || stops.length < 2) {
