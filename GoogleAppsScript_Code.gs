@@ -54,6 +54,7 @@ function doGet(e) {
     if (data.length <= 1) {
       return createJsonResponse({
         status: "success",
+        sheetUrl: ss.getUrl(),
         totalKm: 0,
         count: 0,
         trips: []
@@ -117,6 +118,7 @@ function doGet(e) {
 
     return createJsonResponse({
       status: "success",
+      sheetUrl: ss.getUrl(),
       totalKm: Number(totalKm.toFixed(1)),
       count: trips.length,
       trips: trips

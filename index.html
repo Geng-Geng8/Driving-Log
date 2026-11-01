@@ -306,6 +306,73 @@
       background: #475569;
       box-shadow: none;
     }
+
+    /* Segmented View Switcher & Date Filter Pills */
+    .segmented-control {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 4px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .segmented-btn {
+      min-height: 44px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .segmented-btn:hover:not(.is-active) {
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .segmented-btn.is-active {
+      background: rgba(255, 255, 255, 0.09);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .filter-pill {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.04);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .filter-pill:hover:not(.is-active) {
+      background: rgba(255, 255, 255, 0.07);
+      color: #e2e8f0;
+    }
+
+    .filter-pill.is-active {
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.38);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body class="min-h-screen pb-32 antialiased selection:bg-brand-500/30">
@@ -329,8 +396,8 @@
     >✕</button>
   </div>
 
-  <!-- Header & Status Bar (Clean Typography + Minimal Geometric Waypoint Glyph) -->
-  <header class="sticky top-0 z-40 glass-header px-4 py-3">
+  <!-- Header & Status Bar (Clean Typography + Minimal Geometric Waypoint Glyph + Segmented View Switcher) -->
+  <header class="sticky top-0 z-40 glass-header px-4 pt-3 pb-2.5">
     <div class="max-w-md mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
         <!-- Minimal Geometric Waypoint Glyph -->
@@ -365,9 +432,42 @@
         </button>
       </div>
     </div>
+
+    <!-- Sticky Segmented View Switcher: [ Log Trip ] | [ Tax & Reports ] -->
+    <div class="max-w-md mx-auto mt-2.5">
+      <div class="segmented-control" role="tablist" aria-label="App Navigation">
+        <button
+          type="button"
+          id="navLogTripBtn"
+          role="tab"
+          aria-selected="true"
+          onclick="switchAppView('log')"
+          class="segmented-btn is-active"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span>Log Trip</span>
+        </button>
+        <button
+          type="button"
+          id="navTaxReportsBtn"
+          role="tab"
+          aria-selected="false"
+          onclick="switchAppView('reports')"
+          class="segmented-btn"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <span>Tax &amp; Reports</span>
+        </button>
+      </div>
+    </div>
   </header>
 
-  <main class="max-w-md mx-auto px-4 pt-4 space-y-4">
+  <main class="max-w-md mx-auto px-4 pt-4">
+
+    <!-- ============================================================ -->
+    <!-- VIEW 1: LOG TRIP (DEFAULT VIEW)                              -->
+    <!-- ============================================================ -->
+    <div id="logTripView" class="space-y-4">
 
     <!-- Frequent GTA Schools Quick Add -->
     <section class="space-y-2">
@@ -586,10 +686,151 @@
       </div>
     </section>
 
+    </div><!-- End #logTripView -->
+
+    <!-- ============================================================ -->
+    <!-- VIEW 2: TAX & REPORTS DASHBOARD                              -->
+    <!-- ============================================================ -->
+    <div id="taxReportsView" class="hidden space-y-4 pb-8">
+
+      <!-- 1. Horizontal Date Filter Pills -->
+      <section class="space-y-2">
+        <div class="flex items-center justify-between px-0.5">
+          <span class="micro-label">Audit Window</span>
+          <span id="taxActivePeriodBadge" class="text-[11px] text-slate-400 font-medium">Jul 1 – Dec 31, 2026</span>
+        </div>
+        <div id="taxDateFilterGroup" class="flex gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
+          <button type="button" data-tax-filter="h2_2026" onclick="setTaxDateFilter('h2_2026')" class="filter-pill is-active">July–Dec 2026</button>
+          <button type="button" data-tax-filter="this_month" onclick="setTaxDateFilter('this_month')" class="filter-pill">This Month</button>
+          <button type="button" data-tax-filter="this_week" onclick="setTaxDateFilter('this_week')" class="filter-pill">This Week</button>
+          <button type="button" data-tax-filter="all_time" onclick="setTaxDateFilter('all_time')" class="filter-pill">All Time</button>
+        </div>
+      </section>
+
+      <!-- 2. Top-Level Metric Cards (3 KPIs) -->
+      <section class="space-y-2.5">
+        <!-- KPI 1: Business KM Logged -->
+        <div class="glass-card p-4 flex items-center justify-between">
+          <div class="space-y-1">
+            <div class="micro-label">Business KM Logged</div>
+            <div id="kpiBusinessKm" class="text-2xl font-bold text-brand-400 tabular-nums tracking-tight">0.0 km</div>
+            <div id="kpiBusinessSubtext" class="text-xs text-slate-400">0 trips in selected period</div>
+          </div>
+          <div class="w-11 h-11 rounded-2xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400 shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+          </div>
+        </div>
+
+        <!-- KPI 2 & KPI 3 Grid -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <!-- KPI 2: Total Vehicle KM -->
+          <div class="glass-card p-4 flex flex-col justify-between space-y-2">
+            <div class="micro-label">Total Vehicle KM</div>
+            <div id="kpiTotalVehicleKm" class="text-xl font-bold text-white tabular-nums tracking-tight">-- km</div>
+            <div id="kpiTotalVehicleSubtext" class="text-[11px] text-slate-400 truncate">From odometer baseline</div>
+          </div>
+
+          <!-- KPI 3: Business Use % -->
+          <div class="glass-card p-4 flex flex-col justify-between space-y-2">
+            <div class="micro-label">Business Use %</div>
+            <div id="kpiBusinessUsePct" class="text-xl font-bold text-brand-400 tabular-nums tracking-tight">--%</div>
+            <div class="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+              <div id="kpiBusinessUseBar" class="h-full bg-brand-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. CRA Odometer Baseline Card (Audit Proof) -->
+      <section class="glass-card p-4 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="micro-label">Odometer Baseline (Audit Proof)</div>
+            <p class="text-[11px] text-slate-400 mt-0.5">CRA logbook baseline for calculating business-use ratio</p>
+          </div>
+          <span class="text-[10px] bg-white/[0.05] border border-white/[0.1] text-slate-300 px-2 py-0.5 rounded-md font-medium">CRA T2125 / T2200</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="odomStartInput" class="block text-xs font-medium text-slate-300 mb-1.5">Start Odometer (July 1, 2026 Baseline)</label>
+            <div class="relative">
+              <input
+                type="number"
+                inputmode="decimal"
+                step="0.1"
+                id="odomStartInput"
+                oninput="handleOdometerInput()"
+                placeholder="e.g. 42150"
+                class="w-full input-automotive px-3.5 pr-12 py-2.5 tabular-nums"
+              >
+              <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-slate-500 pointer-events-none font-medium">km</span>
+            </div>
+          </div>
+
+          <div>
+            <label for="odomCurrentInput" class="block text-xs font-medium text-slate-300 mb-1.5">Current Odometer</label>
+            <div class="relative">
+              <input
+                type="number"
+                inputmode="decimal"
+                step="0.1"
+                id="odomCurrentInput"
+                oninput="handleOdometerInput()"
+                placeholder="e.g. 45890"
+                class="w-full input-automotive px-3.5 pr-12 py-2.5 tabular-nums"
+              >
+              <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-slate-500 pointer-events-none font-medium">km</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2.5 border-t border-white/[0.06] flex items-center justify-between">
+          <span class="text-xs text-slate-400 font-medium">Odometer Delta</span>
+          <span id="odomTotalTraveledLabel" class="text-sm font-semibold text-white tabular-nums">Total Traveled: -- km</span>
+        </div>
+      </section>
+
+      <!-- 4. Purpose Breakdown Card -->
+      <section class="glass-card p-4 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <span class="micro-label">Mileage by Purpose Category</span>
+          <span id="purposeTotalTag" class="text-[11px] text-slate-400 font-medium tabular-nums">0.0 km total</span>
+        </div>
+        <div id="purposeBreakdownList" class="space-y-3">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </section>
+
+      <!-- 5. Audit Log (Scrollable Period Trips) -->
+      <section class="glass-card p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="micro-label">Period Audit Log</span>
+          <span id="auditLogCountBadge" class="text-[11px] bg-white/[0.05] border border-white/[0.08] px-2.5 py-0.5 rounded-full text-slate-300 font-medium">0 Trips</span>
+        </div>
+        <div id="taxAuditLogList" class="max-h-80 overflow-y-auto divide-y divide-white/[0.06] pr-0.5">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </section>
+
+      <!-- 6. Action Button: Open Live Google Sheet -->
+      <div class="pt-1">
+        <button
+          type="button"
+          onclick="openLiveGoogleSheet()"
+          class="w-full min-h-[54px] rounded-[16px] bg-white/[0.05] hover:bg-white/[0.09] border border-white/[0.12] hover:border-brand-500/40 text-white font-semibold text-[15px] flex items-center justify-center gap-2.5 shadow-lg"
+        >
+          <svg class="w-5 h-5 text-brand-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span>Open Live Google Sheet</span>
+        </button>
+      </div>
+
+    </div><!-- End #taxReportsView -->
+
   </main>
 
   <!-- Floating Bottom Primary Dock -->
-  <footer class="fixed bottom-0 inset-x-0 glass-dock px-4 pt-3 pb-4 z-40" onclick="handleFooterClick(event)">
+  <footer id="bottomDockFooter" class="fixed bottom-0 inset-x-0 glass-dock px-4 pt-3 pb-4 z-40" onclick="handleFooterClick(event)">
     <div class="max-w-md mx-auto">
       <button 
         id="submitDriveBtn" 
@@ -619,6 +860,10 @@
         <div>
           <label class="block micro-label mb-1.5">Default Home Base (Scarborough)</label>
           <input type="text" id="configHomeInput" class="w-full input-automotive px-3 py-2 text-sm min-h-[44px]">
+        </div>
+        <div>
+          <label class="block micro-label mb-1.5">Google Sheet URL (For "Open Live Sheet")</label>
+          <input type="url" id="configSheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full input-automotive px-3 py-2 text-[11px] font-mono min-h-[44px]">
         </div>
         <div id="configEndpointWrapper">
           <div class="flex items-center justify-between mb-1.5">
@@ -690,6 +935,8 @@
     let isSubmitting = false;
     let searchDebounceTimer = null;
     let alertDismissTimer = null;
+    let currentAppView = "log"; // 'log' | 'tax'
+    let currentTaxFilter = "h2_2026"; // 'h2_2026' | 'this_month' | 'this_week' | 'all_time'
 
     // -------------------------------------------------------------
     // INITIALIZATION & AUTHORIZATION
@@ -698,10 +945,12 @@
       checkMagicLinkAuthorization();
       applyAuthorizationState();
       loadSettings();
+      loadOdometerBaseline();
       renderOriginUI();
       renderFrequentChips();
       renderStops();
       renderRecentDrives(); // renders cached trips immediately
+      renderTaxDashboard();
       updateOfflineQueueBadge();
       setupSearchListener();
       setupOriginInputListener();
@@ -869,8 +1118,11 @@
     function loadSettings() {
       const home = getDefaultHomeAddress();
       const url = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+      const sheetUrl = localStorage.getItem("driving_log_sheet_url") || "";
       document.getElementById("configHomeInput").value = home;
       document.getElementById("configScriptUrlInput").value = url;
+      const sheetInput = document.getElementById("configSheetUrlInput");
+      if (sheetInput) sheetInput.value = sheetUrl;
       renderOriginUI();
       applyAuthorizationState();
     }
@@ -882,8 +1134,15 @@
       }
       const home = document.getElementById("configHomeInput").value.trim();
       const url = document.getElementById("configScriptUrlInput").value.trim();
+      const sheetInput = document.getElementById("configSheetUrlInput");
+      const sheetUrl = sheetInput ? sheetInput.value.trim() : "";
       if (home) localStorage.setItem("driving_log_home", home);
       if (url) localStorage.setItem("driving_log_script_url", url);
+      if (sheetUrl) {
+        localStorage.setItem("driving_log_sheet_url", sheetUrl);
+      } else {
+        localStorage.removeItem("driving_log_sheet_url");
+      }
       loadSettings();
       toggleSettingsModal(false);
       showAlert("Settings saved.", "success");
@@ -1252,8 +1511,14 @@
 
         if (data.status === "success" && Array.isArray(data.trips)) {
           // Google Sheet is the single source of truth! Cache locally on this device
-          localStorage.setItem("driving_log_history", JSON.stringify(data.trips.slice(0, 50)));
+          localStorage.setItem("driving_log_history", JSON.stringify(data.trips.slice(0, 500)));
+          if (data.sheetUrl && typeof data.sheetUrl === "string") {
+            localStorage.setItem("driving_log_sheet_url", data.sheetUrl);
+            const sheetInput = document.getElementById("configSheetUrlInput");
+            if (sheetInput && !sheetInput.value) sheetInput.value = data.sheetUrl;
+          }
           renderRecentDrives(data.trips, data.totalKm);
+          renderTaxDashboard();
           updateConnectionStatus(true, "Sheet Synced");
           if (syncBanner) syncBanner.classList.add("hidden");
           if (showFeedback) showAlert(`✓ Synced ${data.trips.length} drives from Google Sheet!`, "success");
@@ -1593,8 +1858,9 @@
     function saveToRecentHistory(entry) {
       const history = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
       history.unshift(entry);
-      localStorage.setItem("driving_log_history", JSON.stringify(history.slice(0, 50)));
+      localStorage.setItem("driving_log_history", JSON.stringify(history.slice(0, 500)));
       renderRecentDrives();
+      renderTaxDashboard();
     }
 
     function renderRecentDrives(trips = null, totalKmOverride = null) {
@@ -1646,6 +1912,350 @@
           </div>
         `;
       }).join("");
+    }
+
+    // -------------------------------------------------------------
+    // TAX & REPORTS DASHBOARD (PURE CLIENT-SIDE AGGREGATION)
+    // -------------------------------------------------------------
+    const PURPOSE_CATEGORIES = [
+      { id: "shsm", label: "# SHSM Workshop", match: ["shsm workshop", "shsm"] },
+      { id: "cypher", label: "# Cypher Program", match: ["cypher program", "cypher"] },
+      { id: "board", label: "# Board Meeting", match: ["board meeting", "board"] },
+      { id: "site", label: "# Site Visit", match: ["site visit"] },
+      { id: "other", label: "Other", match: [] }
+    ];
+
+    function switchAppView(view) {
+      currentAppView = view === "tax" ? "tax" : "log";
+      const logView = document.getElementById("logTripView");
+      const taxView = document.getElementById("taxReportsView");
+      const footer = document.getElementById("bottomDockFooter");
+      const navLogBtn = document.getElementById("navLogTripBtn");
+      const navTaxBtn = document.getElementById("navTaxReportsBtn");
+
+      if (currentAppView === "tax") {
+        if (logView) logView.classList.add("hidden");
+        if (taxView) taxView.classList.remove("hidden");
+        if (footer) footer.classList.add("hidden");
+        if (navLogBtn) {
+          navLogBtn.classList.remove("is-active");
+          navLogBtn.setAttribute("aria-selected", "false");
+        }
+        if (navTaxBtn) {
+          navTaxBtn.classList.add("is-active");
+          navTaxBtn.setAttribute("aria-selected", "true");
+        }
+        renderTaxDashboard();
+      } else {
+        if (taxView) taxView.classList.add("hidden");
+        if (logView) logView.classList.remove("hidden");
+        if (footer) footer.classList.remove("hidden");
+        if (navTaxBtn) {
+          navTaxBtn.classList.remove("is-active");
+          navTaxBtn.setAttribute("aria-selected", "false");
+        }
+        if (navLogBtn) {
+          navLogBtn.classList.add("is-active");
+          navLogBtn.setAttribute("aria-selected", "true");
+        }
+      }
+    }
+
+    function setTaxDateFilter(filterKey) {
+      currentTaxFilter = filterKey;
+      const group = document.getElementById("taxDateFilterGroup");
+      if (group) {
+        const buttons = group.querySelectorAll("[data-tax-filter]");
+        buttons.forEach(btn => {
+          const isMatch = btn.getAttribute("data-tax-filter") === filterKey;
+          btn.classList.toggle("is-active", isMatch);
+        });
+      }
+      renderTaxDashboard();
+    }
+
+    function loadOdometerBaseline() {
+      const startVal = localStorage.getItem("driving_log_odom_start") || "";
+      const currentVal = localStorage.getItem("driving_log_odom_current") || "";
+      const startInput = document.getElementById("odomStartInput");
+      const currentInput = document.getElementById("odomCurrentInput");
+
+      if (startInput) startInput.value = startVal;
+      if (currentInput) currentInput.value = currentVal;
+      updateOdometerDeltaDisplay();
+    }
+
+    function handleOdometerInput() {
+      const startInput = document.getElementById("odomStartInput");
+      const currentInput = document.getElementById("odomCurrentInput");
+      const startRaw = startInput ? startInput.value.trim() : "";
+      const currentRaw = currentInput ? currentInput.value.trim() : "";
+
+      if (startRaw !== "") {
+        localStorage.setItem("driving_log_odom_start", startRaw);
+      } else {
+        localStorage.removeItem("driving_log_odom_start");
+      }
+
+      if (currentRaw !== "") {
+        localStorage.setItem("driving_log_odom_current", currentRaw);
+      } else {
+        localStorage.removeItem("driving_log_odom_current");
+      }
+
+      updateOdometerDeltaDisplay();
+      renderTaxDashboard();
+    }
+
+    function getOdometerVehicleKm() {
+      const startRaw = localStorage.getItem("driving_log_odom_start");
+      const currentRaw = localStorage.getItem("driving_log_odom_current");
+      if (startRaw === null || startRaw === "" || currentRaw === null || currentRaw === "") {
+        return null;
+      }
+      const startNum = parseFloat(startRaw);
+      const currentNum = parseFloat(currentRaw);
+      if (isNaN(startNum) || isNaN(currentNum) || currentNum < startNum) {
+        return null;
+      }
+      return currentNum - startNum;
+    }
+
+    function updateOdometerDeltaDisplay() {
+      const label = document.getElementById("odomTotalTraveledLabel");
+      if (!label) return;
+      const delta = getOdometerVehicleKm();
+      if (delta === null) {
+        label.innerText = "Total Traveled: -- km";
+        label.className = "text-sm font-semibold text-slate-400 tabular-nums";
+      } else {
+        const formatted = delta % 1 === 0 ? delta.toLocaleString() : delta.toFixed(1);
+        label.innerText = `Total Traveled: ${formatted} km`;
+        label.className = "text-sm font-semibold text-brand-400 tabular-nums";
+      }
+    }
+
+    function getTripDateStr(trip) {
+      if (trip.date && /^\d{4}-\d{2}-\d{2}/.test(String(trip.date))) {
+        return String(trip.date).slice(0, 10);
+      }
+      if (trip.timestamp && /^\d{4}-\d{2}-\d{2}/.test(String(trip.timestamp))) {
+        return String(trip.timestamp).slice(0, 10);
+      }
+      return "";
+    }
+
+    function filterTripsByPeriod(trips, filterKey) {
+      const now = new Date();
+      const todayYear = now.getFullYear();
+      const todayMonth = String(now.getMonth() + 1).padStart(2, "0");
+      const currentYearMonth = `${todayYear}-${todayMonth}`;
+
+      // Compute Monday of current week (ISO week start) and Sunday end
+      const dayOfWeek = now.getDay(); // 0 (Sun) to 6 (Sat)
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+      const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+      const fmtDate = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
+      const weekStartStr = fmtDate(monday);
+      const weekEndStr = fmtDate(sunday);
+
+      const badge = document.getElementById("taxActivePeriodBadge");
+      if (badge) {
+        if (filterKey === "h2_2026") {
+          badge.innerText = "Jul 1 – Dec 31, 2026";
+        } else if (filterKey === "this_month") {
+          badge.innerText = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        } else if (filterKey === "this_week") {
+          badge.innerText = `${weekStartStr} → ${weekEndStr}`;
+        } else {
+          badge.innerText = "All Logged Drives";
+        }
+      }
+
+      return trips.filter(trip => {
+        const dStr = getTripDateStr(trip);
+        if (filterKey === "all_time") return true;
+        if (!dStr) return false;
+
+        if (filterKey === "h2_2026") {
+          return dStr >= "2026-07-01" && dStr <= "2026-12-31";
+        }
+        if (filterKey === "this_month") {
+          return dStr.startsWith(currentYearMonth);
+        }
+        if (filterKey === "this_week") {
+          return dStr >= weekStartStr && dStr <= weekEndStr;
+        }
+        return true;
+      });
+    }
+
+    function classifyTripPurpose(notes) {
+      const n = String(notes || "").toLowerCase();
+      for (let i = 0; i < PURPOSE_CATEGORIES.length - 1; i++) {
+        const cat = PURPOSE_CATEGORIES[i];
+        for (let j = 0; j < cat.match.length; j++) {
+          if (n.includes(cat.match[j])) {
+            return cat.label;
+          }
+        }
+      }
+      return "Other";
+    }
+
+    function renderTaxDashboard() {
+      const allTrips = JSON.parse(localStorage.getItem("driving_log_history") || "[]");
+      const filteredTrips = filterTripsByPeriod(allTrips, currentTaxFilter);
+
+      // 1. Business KM Logged
+      const businessKm = filteredTrips.reduce((sum, t) => sum + (Number(t.km) || 0), 0);
+      const kpiBusinessEl = document.getElementById("kpiBusinessKm");
+      const kpiBusinessSubEl = document.getElementById("kpiBusinessSubtext");
+      if (kpiBusinessEl) kpiBusinessEl.innerText = `${businessKm.toFixed(1)} km`;
+      if (kpiBusinessSubEl) {
+        kpiBusinessSubEl.innerText = `${filteredTrips.length} ${filteredTrips.length === 1 ? "trip" : "trips"} in selected period`;
+      }
+
+      // 2. Total Vehicle KM & 3. Business Use %
+      const vehicleKm = getOdometerVehicleKm();
+      const kpiVehicleEl = document.getElementById("kpiTotalVehicleKm");
+      const kpiVehicleSubEl = document.getElementById("kpiTotalVehicleSubtext");
+      const kpiPctEl = document.getElementById("kpiBusinessUsePct");
+      const kpiBarEl = document.getElementById("kpiBusinessUseBar");
+
+      updateOdometerDeltaDisplay();
+
+      if (vehicleKm === null || vehicleKm <= 0) {
+        if (kpiVehicleEl) kpiVehicleEl.innerText = "-- km";
+        if (kpiVehicleSubEl) kpiVehicleSubEl.innerText = "Enter odometer below";
+        if (kpiPctEl) kpiPctEl.innerText = "--%";
+        if (kpiBarEl) kpiBarEl.style.width = "0%";
+      } else {
+        const formattedVehicleKm = vehicleKm % 1 === 0 ? vehicleKm.toLocaleString() : vehicleKm.toFixed(1);
+        if (kpiVehicleEl) kpiVehicleEl.innerText = `${formattedVehicleKm} km`;
+        if (kpiVehicleSubEl) kpiVehicleSubEl.innerText = "Current − Start Odometer";
+
+        const rawPct = (businessKm / vehicleKm) * 100;
+        const clampedBarPct = Math.min(100, Math.max(0, rawPct));
+        if (kpiPctEl) kpiPctEl.innerText = `${rawPct.toFixed(1)}%`;
+        if (kpiBarEl) kpiBarEl.style.width = `${clampedBarPct.toFixed(1)}%`;
+      }
+
+      // 4. Purpose Breakdown
+      const purposeTotals = {};
+      const purposeCounts = {};
+      PURPOSE_CATEGORIES.forEach(c => {
+        purposeTotals[c.label] = 0;
+        purposeCounts[c.label] = 0;
+      });
+
+      filteredTrips.forEach(t => {
+        const catLabel = classifyTripPurpose(t.notes);
+        const km = Number(t.km) || 0;
+        purposeTotals[catLabel] = (purposeTotals[catLabel] || 0) + km;
+        purposeCounts[catLabel] = (purposeCounts[catLabel] || 0) + 1;
+      });
+
+      const purposeTotalTag = document.getElementById("purposeTotalTag");
+      if (purposeTotalTag) purposeTotalTag.innerText = `${businessKm.toFixed(1)} km total`;
+
+      const breakdownEl = document.getElementById("purposeBreakdownList");
+      if (breakdownEl) {
+        breakdownEl.innerHTML = PURPOSE_CATEGORIES.map(c => {
+          const km = purposeTotals[c.label] || 0;
+          const count = purposeCounts[c.label] || 0;
+          const pct = businessKm > 0 ? (km / businessKm) * 100 : 0;
+          const barWidth = Math.min(100, Math.max(0, pct));
+          const isOther = c.id === "other";
+
+          return `
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="${isOther ? "text-slate-300" : "text-white"} font-semibold truncate">${c.label}</span>
+                  <span class="text-[11px] text-slate-500 tabular-nums">(${count})</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0 tabular-nums">
+                  <span class="text-[11px] text-slate-400">${pct.toFixed(0)}%</span>
+                  <span class="font-bold text-white w-16 text-right">${km.toFixed(1)} km</span>
+                </div>
+              </div>
+              <div class="w-full h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                <div class="h-full ${km > 0 ? "bg-brand-500" : "bg-transparent"} rounded-full transition-all duration-300" style="width: ${barWidth.toFixed(1)}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      // 5. Audit Log List
+      const auditBadge = document.getElementById("auditLogCountBadge");
+      if (auditBadge) {
+        auditBadge.innerText = `${filteredTrips.length} ${filteredTrips.length === 1 ? "Trip" : "Trips"}`;
+      }
+
+      const auditListEl = document.getElementById("taxAuditLogList");
+      if (auditListEl) {
+        if (filteredTrips.length === 0) {
+          auditListEl.innerHTML = `
+            <div class="py-8 text-center">
+              <p class="text-sm text-slate-300 font-medium">No logged drives in this period</p>
+              <p class="text-xs text-slate-500 mt-1">Switch date filters above or log a new circuit.</p>
+            </div>
+          `;
+        } else {
+          auditListEl.innerHTML = filteredTrips.map(t => {
+            const dStr = getTripDateStr(t) || "—";
+            const rawRoute = t.stops || t.route || t.notes || "Trip";
+            const cleanedRoute = cleanRouteForDisplay(rawRoute);
+            const categoryLabel = classifyTripPurpose(t.notes);
+            const kmVal = Number(t.km) > 0 ? `${Number(t.km).toFixed(1)} km` : "0.0 km";
+
+            return `
+              <div class="py-3 first:pt-1 last:pb-1 flex items-center justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[11px] font-mono text-slate-400 tabular-nums">${dStr}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/25 text-brand-300 font-semibold">${categoryLabel}</span>
+                  </div>
+                  <div class="text-xs font-semibold text-white truncate" title="${cleanedRoute.replace(/"/g, '&quot;')}">
+                    ${cleanedRoute}
+                  </div>
+                </div>
+                <div class="text-sm font-bold text-brand-400 tabular-nums shrink-0">
+                  ${kmVal}
+                </div>
+              </div>
+            `;
+          }).join("");
+        }
+      }
+    }
+
+    function openLiveGoogleSheet() {
+      const savedSheetUrl = localStorage.getItem("driving_log_sheet_url");
+      if (savedSheetUrl && savedSheetUrl.startsWith("http")) {
+        window.open(savedSheetUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const entered = window.prompt(
+        "Paste your Google Sheet URL once to link 'Open Live Google Sheet' directly to your spreadsheet:",
+        "https://docs.google.com/spreadsheets/"
+      );
+      if (entered && entered.trim().startsWith("http")) {
+        const cleanUrl = entered.trim();
+        localStorage.setItem("driving_log_sheet_url", cleanUrl);
+        const sheetInput = document.getElementById("configSheetUrlInput");
+        if (sheetInput) sheetInput.value = cleanUrl;
+        window.open(cleanUrl, "_blank", "noopener,noreferrer");
+      }
     }
 
     function showAlert(msg, type = "info") {
@@ -1731,7 +2341,7 @@ function doGet(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
     const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: 0, trips: [] })).setMimeType(ContentService.MimeType.JSON);
+    if (data.length <= 1) return ContentService.createTextOutput(JSON.stringify({ status: "success", sheetUrl: ss.getUrl(), totalKm: 0, trips: [] })).setMimeType(ContentService.MimeType.JSON);
 
     const headers = data[0].map(h => String(h || "").trim().toLowerCase());
     let idIdx = headers.findIndex(h => h.includes("trip id") || h === "id"); if (idIdx === -1) idIdx = 0;
@@ -1750,7 +2360,7 @@ function doGet(e) {
       let cleanRoute = cleanRouteString(String(row[routeIdx] || ""));
       trips.push({ tripId: String(row[idIdx] || 'SYNCED'), date: formattedDate, notes: String(row[notesIdx] || ""), route: cleanRoute, stops: cleanRoute, km: Number(kmVal.toFixed(1)), synced: true });
     }
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", totalKm: Number(totalKm.toFixed(1)), trips: trips })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", sheetUrl: ss.getUrl(), totalKm: Number(totalKm.toFixed(1)), trips: trips })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
