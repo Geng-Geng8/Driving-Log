@@ -38,6 +38,19 @@ const KNOWN_LOCATIONS = [
   { name: "Maria Goretti", patterns: ["21 Tabor", "Goretti"] },
   { name: "St. Agatha", patterns: ["Agatha"] },
   { name: "St. Nicholas", patterns: ["Nicholas"] },
+  { name: "Notre Dame CSS (Ajax)", patterns: ["1375 Harwood", "Harwood Ave"] },
+  { name: "Notre Dame HS (Toronto)", patterns: ["12 Malvern", "Malvern Ave"] },
+  { name: "Notre Dame CSS (Brampton)", patterns: ["2 Notre Dame Ave", "2 Notre Dame"] },
+  { name: "St. Mary CSS (Pickering)", patterns: ["1918 Whites", "Whites Rd"] },
+  { name: "St. Mary Academy (Toronto)", patterns: ["66 Dufferin Park", "Dufferin Park Ave"] },
+  { name: "St. Joan of Arc (Scarborough)", patterns: ["959 Midland", "Midland Ave"] },
+  { name: "St. Joan of Arc (Mississauga)", patterns: ["3801 Thomas", "Thomas St"] },
+  { name: "St. Joseph's College (Toronto)", patterns: ["74 Wellesley", "Wellesley St"] },
+  { name: "St. Joseph Secondary (Mississauga)", patterns: ["5555 Creditview", "Creditview Rd"] },
+  { name: "St. Francis Xavier (Mississauga)", patterns: ["50 Bristol", "Bristol Rd"] },
+  { name: "Pine Ridge SS", patterns: ["2155 Liverpool", "Liverpool Rd"] },
+  { name: "Pickering HS", patterns: ["180 Church", "Church St N"] },
+  { name: "Milliken Mills HS", patterns: ["7522 Kennedy", "Milliken Mills"] },
   { name: "Downtown Office", patterns: ["100 Queen", "City Hall"] }
 ];
 

@@ -921,15 +921,56 @@
     };
 
     const PRESET_SCHOOLS = [
-      { name: "Chaminade College", address: "Chaminade College School, 490 Queen's Dr, North York, ON", board: "TCDSB" },
-      { name: "CEC Board Office", address: "80 Sheppard Ave E, North York, ON M2N 6E8", board: "TCDSB" },
-      { name: "St. John Paul II", address: "St. John Paul II CSS, 685 Military Trail, Scarborough, ON", board: "TCDSB" },
-      { name: "St. Columba", address: "St. Columba Catholic School, 1054 Military Trail, Scarborough, ON", board: "TCDSB" },
-      { name: "St. Mother Teresa", address: "St. Mother Teresa CA, 440 Sewells Rd, Scarborough, ON", board: "TCDSB" },
-      { name: "Madonna CSS", address: "Madonna Catholic Secondary School, 20 Cresswell Ave, North York, ON", board: "TCDSB" },
-      { name: "St. Basil-the-Great", address: "St. Basil-the-Great College, 20 Weston Rd, North York, ON", board: "TCDSB" },
-      { name: "Maria Goretti", address: "Maria Goretti Catholic School, 21 Tabor Rd, Scarborough, ON", board: "TCDSB" }
+      // Frequent / Primary Rotation
+      { name: "Chaminade College", address: "490 Queen's Dr", city: "North York", board: "TCDSB", frequent: true },
+      { name: "CEC Board Office", address: "80 Sheppard Ave E", city: "North York", board: "TCDSB", frequent: true },
+      { name: "St. John Paul II CSS", address: "685 Military Trail", city: "Scarborough", board: "TCDSB", frequent: true },
+      { name: "St. Columba Catholic School", address: "1054 Military Trail", city: "Scarborough", board: "TCDSB", frequent: true },
+      { name: "St. Mother Teresa CA", address: "440 Sewells Rd", city: "Scarborough", board: "TCDSB", frequent: true },
+      { name: "Madonna CSS", address: "20 Cresswell Ave", city: "North York", board: "TCDSB", frequent: true },
+      { name: "St. Basil-the-Great College", address: "20 Weston Rd", city: "North York", board: "TCDSB", frequent: true },
+      { name: "Maria Goretti Catholic School", address: "21 Tabor Rd", city: "Scarborough", board: "TCDSB", frequent: true },
+
+      // Duplicate / Shared-Name Schools (Explicit disambiguation across GTA)
+      // Notre Dame
+      { name: "Notre Dame CSS", address: "1375 Harwood Ave N", city: "Ajax", board: "DCDSB" },
+      { name: "Notre Dame High School", address: "12 Malvern Ave", city: "Toronto", board: "TCDSB" },
+      { name: "Notre Dame CSS", address: "2 Notre Dame Ave", city: "Brampton", board: "DPCDSB" },
+
+      // St. Mary
+      { name: "St. Mary CSS", address: "1918 Whites Rd", city: "Pickering", board: "DCDSB" },
+      { name: "St. Mary Catholic Academy", address: "66 Dufferin Park Ave", city: "Toronto", board: "TCDSB" },
+
+      // St. Joan of Arc
+      { name: "St. Joan of Arc Catholic Academy", address: "959 Midland Ave", city: "Scarborough", board: "TCDSB" },
+      { name: "St. Joan of Arc CSS", address: "3801 Thomas St", city: "Mississauga", board: "DPCDSB" },
+
+      // St. Joseph
+      { name: "St. Joseph's College School", address: "74 Wellesley St W", city: "Toronto", board: "TCDSB" },
+      { name: "St. Joseph Secondary School", address: "5555 Creditview Rd", city: "Mississauga", board: "DPCDSB" },
+
+      // St. Francis Xavier
+      { name: "St. Francis Xavier SS", address: "50 Bristol Rd W", city: "Mississauga", board: "DPCDSB" },
+
+      // Additional Standard GTA Schools
+      { name: "St. Agatha Catholic School", address: "1075 Silver Creek Dr", city: "Scarborough", board: "TCDSB" },
+      { name: "St. Nicholas Catholic School", address: "33 Daisy Ave", city: "Etobicoke", board: "TCDSB" },
+      { name: "Pine Ridge Secondary School", address: "2155 Liverpool Rd", city: "Pickering", board: "DDSB" },
+      { name: "Pickering High School", address: "180 Church St N", city: "Ajax", board: "DDSB" },
+      { name: "Milliken Mills High School", address: "7522 Kennedy Rd", city: "Markham", board: "YRDSB" },
+      { name: "Father Michael McGivney CA", address: "5300 14th Ave", city: "Markham", board: "YCDSB" },
+      { name: "St. Brother André CHS", address: "6160 16th Ave", city: "Markham", board: "YCDSB" },
+      { name: "St. Augustine CHS", address: "2188 Rodick Rd", city: "Markham", board: "YCDSB" },
+      { name: "St. Robert CHS", address: "8101 Leslie St", city: "Thornhill", board: "YCDSB" }
     ];
+
+    function getFullAddress(item) {
+      if (!item) return "";
+      if (!item.city || (item.address && item.address.toLowerCase().includes(item.city.toLowerCase()))) {
+        return item.address || "";
+      }
+      return `${item.address}, ${item.city}, ON`;
+    }
 
     let currentOrigin = null; // null = default home, or { name: string, address: string }
     let currentStops = [];
@@ -1255,14 +1296,18 @@
       const container = document.getElementById("frequentChips");
       if (!container) return;
 
-      container.innerHTML = PRESET_SCHOOLS.map(school => {
+      const chipsList = PRESET_SCHOOLS.filter(s => s.frequent);
+      const listToRender = chipsList.length ? chipsList : PRESET_SCHOOLS.slice(0, 8);
+
+      container.innerHTML = listToRender.map(school => {
+        const fullAddr = getFullAddress(school);
         const isSelected = currentStops.some(s => s.name === school.name);
         return `
           <button 
             type="button"
-            onclick="addStop('${school.name.replace(/'/g, "\\'")}', '${school.address.replace(/'/g, "\\'")}')" 
+            onclick="addStop('${school.name.replace(/'/g, "\\'")}', '${fullAddr.replace(/'/g, "\\'")}')" 
             class="shrink-0 chip-slate ${isSelected ? 'is-selected' : ''}"
-            title="${school.address.replace(/"/g, '&quot;')}"
+            title="${fullAddr.replace(/"/g, '&quot;')}"
           >
             <svg class="w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'} shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <span>${school.name}</span>
@@ -1303,25 +1348,45 @@
       });
     }
 
-    function isTcdsbSchool(item) {
-      if (!item) return false;
-      if (item.board === "TCDSB") return true;
-      const combined = `${item.name || ""} ${item.address || ""}`.toLowerCase();
-      const keywords = [
-        "st.", "st ", "catholic", "css", "chaminade", "madonna", 
-        "basil", "cec", "goretti", "agatha", "nicholas", "paul"
-      ];
-      return keywords.some(k => combined.includes(k));
+    function getSchoolBoardBadge(board) {
+      const b = (board || "").toUpperCase();
+      switch (b) {
+        case "TCDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">TCDSB</span>`;
+        case "TDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">TDSB</span>`;
+        case "DPCDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-teal-500/15 text-teal-400 border border-teal-500/30">DPCDSB</span>`;
+        case "PDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">PDSB</span>`;
+        case "DCDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">DCDSB</span>`;
+        case "DDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-purple-500/15 text-purple-400 border border-purple-500/30">DDSB</span>`;
+        case "YCDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">YCDSB</span>`;
+        case "YRDSB":
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">YRDSB</span>`;
+        default:
+          return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded bg-slate-800 text-slate-400 border border-slate-700">GTA</span>`;
+      }
     }
 
     async function executeTorontoSearch(query) {
       const resultsContainer = document.getElementById("autocompleteResults");
       const normalizedQuery = query.toLowerCase();
 
-      // 1. Check local preset schools first
-      const localMatches = PRESET_SCHOOLS.filter(s => 
-        s.name.toLowerCase().includes(normalizedQuery) || s.address.toLowerCase().includes(normalizedQuery)
-      );
+      // 1. Check local preset schools matching name, address, city, or board
+      const localMatches = PRESET_SCHOOLS.filter(s => {
+        const n = (s.name || "").toLowerCase();
+        const a = (s.address || "").toLowerCase();
+        const c = (s.city || "").toLowerCase();
+        const b = (s.board || "").toLowerCase();
+        return n.includes(normalizedQuery) || 
+               a.includes(normalizedQuery) || 
+               c.includes(normalizedQuery) || 
+               b.includes(normalizedQuery);
+      });
 
       // 2. Fetch live suggestions biased to Toronto coordinates (lat: 43.6532, lon: -79.3832)
       let externalResults = [];
@@ -1335,18 +1400,18 @@
             const city = p.city || p.district || "Toronto";
             const label = p.name || street;
             const fullAddress = [label, street !== label ? street : null, city, p.state || "ON"].filter(Boolean).join(", ");
-            return { name: label, address: fullAddress };
+            return { name: label, address: street || fullAddress, city: city, board: "GTA" };
           });
         }
       } catch (err) {
         console.warn("Geocoder fallback to local query:", err);
       }
 
-      // Deduplicate results
+      // Deduplicate results by name, city, and address
       const seen = new Set();
       const deduped = [];
       for (const item of [...localMatches, ...externalResults]) {
-        const key = `${item.name}|${item.address}`.toLowerCase();
+        const key = `${item.name}|${item.city || ""}|${item.address}`.toLowerCase();
         if (!seen.has(key)) {
           seen.add(key);
           deduped.push(item);
@@ -1362,7 +1427,7 @@
           <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
             <div onclick="addStop('${safeQuery}', '${safeQuery}, Toronto, ON, Canada')" class="flex-1 min-w-0 pr-1">
               <div class="font-medium text-white text-[14px] leading-snug">${query}</div>
-              <div class="text-xs text-slate-400 leading-relaxed break-words mt-0.5">Add waypoint with Toronto, ON bias</div>
+              <div class="text-xs text-slate-300 break-words leading-relaxed mt-0.5">Add waypoint with Toronto, ON bias</div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <button 
@@ -1386,25 +1451,28 @@
       } else {
         resultsContainer.innerHTML = combined.map(item => {
           const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          const safeAddr = item.address.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          const isCatholic = isTcdsbSchool(item);
-          const tcdsbBadge = isCatholic 
-            ? `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">TCDSB</span>`
-            : "";
+          const fullAddr = getFullAddress(item);
+          const safeFullAddr = fullAddr.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          const boardBadge = getSchoolBoardBadge(item.board);
+          
+          // Format line 2 with highlighted city tag
+          const addressLine = item.city && !item.address.toLowerCase().includes(item.city.toLowerCase())
+            ? `${item.address} • <span class="text-slate-400 font-medium">${item.city}</span>`
+            : item.address;
 
           return `
             <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
-              <div onclick="addStop('${safeName}', '${safeAddr}')" class="flex-1 min-w-0 pr-1">
-                <div class="font-medium text-white text-[14px] leading-snug flex items-center flex-wrap gap-1">
+              <div onclick="addStop('${safeName}', '${safeFullAddr}')" class="flex-1 min-w-0 pr-1">
+                <div class="font-bold text-white text-[14px] leading-snug flex items-center flex-wrap gap-1">
                   <span>${item.name}</span>
-                  ${tcdsbBadge}
+                  ${boardBadge}
                 </div>
-                <div class="text-xs text-slate-400 leading-relaxed break-words mt-0.5">${item.address}</div>
+                <div class="text-xs text-slate-300 break-words leading-relaxed mt-0.5">${addressLine}</div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <button 
                   type="button" 
-                  onclick="event.stopPropagation(); setOriginLocation('${safeName}', '${safeAddr}')" 
+                  onclick="event.stopPropagation(); setOriginLocation('${safeName}', '${safeFullAddr}')" 
                   class="min-h-[40px] text-xs font-medium text-slate-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.22] px-3 py-1.5 rounded-xl transition active:scale-95"
                   title="Use as starting point for this trip"
                 >
@@ -1412,7 +1480,7 @@
                 </button>
                 <button 
                   type="button" 
-                  onclick="event.stopPropagation(); addStop('${safeName}', '${safeAddr}')" 
+                  onclick="event.stopPropagation(); addStop('${safeName}', '${safeFullAddr}')" 
                   class="min-h-[40px] min-w-[40px] w-10 h-10 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 text-brand-300 hover:text-white font-semibold flex items-center justify-center transition active:scale-95"
                   title="Add stop"
                 >
@@ -1602,6 +1670,19 @@
       { name: "Maria Goretti", patterns: ["21 Tabor", "Goretti"] },
       { name: "St. Agatha", patterns: ["Agatha"] },
       { name: "St. Nicholas", patterns: ["Nicholas"] },
+      { name: "Notre Dame CSS (Ajax)", patterns: ["1375 Harwood", "Harwood Ave"] },
+      { name: "Notre Dame HS (Toronto)", patterns: ["12 Malvern", "Malvern Ave"] },
+      { name: "Notre Dame CSS (Brampton)", patterns: ["2 Notre Dame Ave", "2 Notre Dame"] },
+      { name: "St. Mary CSS (Pickering)", patterns: ["1918 Whites", "Whites Rd"] },
+      { name: "St. Mary Academy (Toronto)", patterns: ["66 Dufferin Park", "Dufferin Park Ave"] },
+      { name: "St. Joan of Arc (Scarborough)", patterns: ["959 Midland", "Midland Ave"] },
+      { name: "St. Joan of Arc (Mississauga)", patterns: ["3801 Thomas", "Thomas St"] },
+      { name: "St. Joseph's College (Toronto)", patterns: ["74 Wellesley", "Wellesley St"] },
+      { name: "St. Joseph Secondary (Mississauga)", patterns: ["5555 Creditview", "Creditview Rd"] },
+      { name: "St. Francis Xavier (Mississauga)", patterns: ["50 Bristol", "Bristol Rd"] },
+      { name: "Pine Ridge SS", patterns: ["2155 Liverpool", "Liverpool Rd"] },
+      { name: "Pickering HS", patterns: ["180 Church", "Church St N"] },
+      { name: "Milliken Mills HS", patterns: ["7522 Kennedy", "Milliken Mills"] },
       { name: "Downtown Office", patterns: ["100 Queen", "City Hall"] }
     ];
 
