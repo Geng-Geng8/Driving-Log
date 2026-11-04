@@ -1,8 +1,11 @@
 {
+  "id": "/Driving-Log/",
   "name": "Trip Log",
   "short_name": "Trip Log",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
   "background_color": "#020617",
   "theme_color": "#020617",
   "icons": [
