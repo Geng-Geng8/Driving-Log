@@ -979,6 +979,7 @@
     let alertDismissTimer = null;
     let currentAppView = "log"; // 'log' | 'tax'
     let currentTaxFilter = "h2_2026"; // 'h2_2026' | 'this_month' | 'this_week' | 'all_time'
+    window.LOCAL_SCHOOLS = [];
 
     // -------------------------------------------------------------
     // INITIALIZATION & AUTHORIZATION
@@ -999,6 +1000,7 @@
       setTripDateToToday();
       populateAppsScriptCodeBlock();
       setupViewSwitcher();
+      loadLocalSchools();
 
       // Mirror live sheet data in background
       syncWithGoogleSheet(false);
@@ -1348,8 +1350,26 @@
       });
     }
 
+    async function loadLocalSchools() {
+      try {
+        const res = await fetch("./schools.json");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            window.LOCAL_SCHOOLS = data;
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load schools.json, falling back:", err);
+      }
+      if (!Array.isArray(window.LOCAL_SCHOOLS) || window.LOCAL_SCHOOLS.length === 0) {
+        window.LOCAL_SCHOOLS = [];
+      }
+    }
+
     function getSchoolBoardBadge(board) {
-      const b = (board || "").toUpperCase();
+      const b = (board || "").toUpperCase().trim();
       switch (b) {
         case "TCDSB":
           return `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">TCDSB</span>`;
@@ -1372,56 +1392,9 @@
       }
     }
 
-    async function executeTorontoSearch(query) {
+    function renderSearchResultItems(items, query) {
       const resultsContainer = document.getElementById("autocompleteResults");
-      const normalizedQuery = query.toLowerCase();
-
-      // 1. Check local preset schools matching name, address, city, or board
-      const localMatches = PRESET_SCHOOLS.filter(s => {
-        const n = (s.name || "").toLowerCase();
-        const a = (s.address || "").toLowerCase();
-        const c = (s.city || "").toLowerCase();
-        const b = (s.board || "").toLowerCase();
-        return n.includes(normalizedQuery) || 
-               a.includes(normalizedQuery) || 
-               c.includes(normalizedQuery) || 
-               b.includes(normalizedQuery);
-      });
-
-      // 2. Fetch live suggestions biased to Toronto coordinates (lat: 43.6532, lon: -79.3832)
-      let externalResults = [];
-      try {
-        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=43.6532&lon=-79.3832&limit=5`);
-        if (res.ok) {
-          const data = await res.json();
-          externalResults = (data.features || []).map(f => {
-            const p = f.properties;
-            const street = [p.housenumber, p.street].filter(Boolean).join(" ");
-            const city = p.city || p.district || "Toronto";
-            const label = p.name || street;
-            const fullAddress = [label, street !== label ? street : null, city, p.state || "ON"].filter(Boolean).join(", ");
-            return { name: label, address: street || fullAddress, city: city, board: "GTA" };
-          });
-        }
-      } catch (err) {
-        console.warn("Geocoder fallback to local query:", err);
-      }
-
-      // Deduplicate results by name, city, and address
-      const seen = new Set();
-      const deduped = [];
-      for (const item of [...localMatches, ...externalResults]) {
-        const key = `${item.name}|${item.city || ""}|${item.address}`.toLowerCase();
-        if (!seen.has(key)) {
-          seen.add(key);
-          deduped.push(item);
-        }
-      }
-
-      // Cap to maximum 3 results for mobile ergonomic space
-      const combined = deduped.slice(0, 3);
-
-      if (combined.length === 0) {
+      if (!items || items.length === 0) {
         const safeQuery = query.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         resultsContainer.innerHTML = `
           <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
@@ -1448,51 +1421,114 @@
             </div>
           </div>
         `;
-      } else {
-        resultsContainer.innerHTML = combined.map(item => {
-          const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          const fullAddr = getFullAddress(item);
-          const safeFullAddr = fullAddr.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-          const boardBadge = getSchoolBoardBadge(item.board);
-          
-          // Format line 2 with highlighted city tag
-          const addressLine = item.city && !item.address.toLowerCase().includes(item.city.toLowerCase())
-            ? `${item.address} • <span class="text-slate-400 font-medium">${item.city}</span>`
-            : item.address;
-
-          return `
-            <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
-              <div onclick="addStop('${safeName}', '${safeFullAddr}')" class="flex-1 min-w-0 pr-1">
-                <div class="font-bold text-white text-[14px] leading-snug flex items-center flex-wrap gap-1">
-                  <span>${item.name}</span>
-                  ${boardBadge}
-                </div>
-                <div class="text-xs text-slate-300 break-words leading-relaxed mt-0.5">${addressLine}</div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <button 
-                  type="button" 
-                  onclick="event.stopPropagation(); setOriginLocation('${safeName}', '${safeFullAddr}')" 
-                  class="min-h-[40px] text-xs font-medium text-slate-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.22] px-3 py-1.5 rounded-xl transition active:scale-95"
-                  title="Use as starting point for this trip"
-                >
-                  Set Start
-                </button>
-                <button 
-                  type="button" 
-                  onclick="event.stopPropagation(); addStop('${safeName}', '${safeFullAddr}')" 
-                  class="min-h-[40px] min-w-[40px] w-10 h-10 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 text-brand-300 hover:text-white font-semibold flex items-center justify-center transition active:scale-95"
-                  title="Add stop"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                </button>
-              </div>
-            </div>
-          `;
-        }).join("");
+        resultsContainer.classList.remove("hidden");
+        return;
       }
 
+      resultsContainer.innerHTML = items.slice(0, 3).map(item => {
+        const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const fullAddr = getFullAddress(item);
+        const safeFullAddr = fullAddr.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const boardBadge = getSchoolBoardBadge(item.board);
+        const subtitle = item.city && !item.address.toLowerCase().includes(item.city.toLowerCase())
+          ? `${item.address} • ${item.city}`
+          : item.address;
+
+        return `
+          <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
+            <div onclick="addStop('${safeName}', '${safeFullAddr}')" class="flex-1 min-w-0 pr-1">
+              <div class="font-bold text-white text-[14px] leading-snug flex items-center flex-wrap gap-1">
+                <span>${item.name}</span>
+                ${boardBadge}
+              </div>
+              <div class="text-xs text-slate-300 break-words leading-relaxed mt-0.5">${subtitle}</div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button 
+                type="button" 
+                onclick="event.stopPropagation(); setOriginLocation('${safeName}', '${safeFullAddr}')" 
+                class="min-h-[40px] text-xs font-medium text-slate-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.22] px-3 py-1.5 rounded-xl transition active:scale-95"
+                title="Use as starting point for this trip"
+              >
+                Set Start
+              </button>
+              <button 
+                type="button" 
+                onclick="event.stopPropagation(); addStop('${safeName}', '${safeFullAddr}')" 
+                class="min-h-[40px] min-w-[40px] w-10 h-10 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 text-brand-300 hover:text-white font-semibold flex items-center justify-center transition active:scale-95"
+                title="Add stop"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
       resultsContainer.classList.remove("hidden");
+    }
+
+    async function executeTorontoSearch(query) {
+      const normalizedQuery = query.toLowerCase();
+
+      const dataset = (Array.isArray(window.LOCAL_SCHOOLS) && window.LOCAL_SCHOOLS.length > 0)
+        ? window.LOCAL_SCHOOLS
+        : PRESET_SCHOOLS;
+
+      // 1. Query local dataset across name, address, city, and board
+      const localMatches = dataset.filter(s => {
+        const n = (s.name || "").toLowerCase();
+        const a = (s.address || "").toLowerCase();
+        const c = (s.city || "").toLowerCase();
+        const b = (s.board || "").toLowerCase();
+        return n.includes(normalizedQuery) || 
+               a.includes(normalizedQuery) || 
+               c.includes(normalizedQuery) || 
+               b.includes(normalizedQuery);
+      });
+
+      // 2. If 3 or more local matches are found, render immediately with 0ms latency!
+      if (localMatches.length >= 3) {
+        renderSearchResultItems(localMatches.slice(0, 3), query);
+        return;
+      }
+
+      // If 1 or 2 matches found locally, render them immediately so user sees instant results
+      if (localMatches.length > 0) {
+        renderSearchResultItems(localMatches, query);
+      }
+
+      // 3. If fewer than 3 matches exist, query live geocoder to fill remaining slots up to 3 total
+      let externalResults = [];
+      try {
+        const needed = 3 - localMatches.length;
+        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=43.6532&lon=-79.3832&limit=${needed + 2}`);
+        if (res.ok) {
+          const data = await res.json();
+          externalResults = (data.features || []).map(f => {
+            const p = f.properties;
+            const street = [p.housenumber, p.street].filter(Boolean).join(" ");
+            const city = p.city || p.district || "Toronto";
+            const label = p.name || street;
+            return { name: label, address: street || label, city: city, board: "GTA" };
+          });
+        }
+      } catch (err) {
+        console.warn("Geocoder fallback to local query:", err);
+      }
+
+      // Deduplicate results
+      const seen = new Set();
+      const deduped = [];
+      for (const item of [...localMatches, ...externalResults]) {
+        const key = `${item.name}|${item.city || ""}|${item.address}`.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(item);
+        }
+      }
+
+      renderSearchResultItems(deduped.slice(0, 3), query);
     }
 
     function hideAutocomplete() {

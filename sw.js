@@ -1,9 +1,10 @@
-const CACHE_NAME = 'driving-log-v1';
+const CACHE_NAME = 'driving-log-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.png'
+  './icon.png',
+  './schools.json'
 ];
 
 self.addEventListener('install', (event) => {
