@@ -921,14 +921,14 @@
     };
 
     const PRESET_SCHOOLS = [
-      { name: "Chaminade College", address: "Chaminade College School, 490 Queen's Dr, North York, ON" },
-      { name: "CEC Board Office", address: "80 Sheppard Ave E, North York, ON M2N 6E8" },
-      { name: "St. John Paul II", address: "St. John Paul II CSS, 685 Military Trail, Scarborough, ON" },
-      { name: "St. Columba", address: "St. Columba Catholic School, 1054 Military Trail, Scarborough, ON" },
-      { name: "St. Mother Teresa", address: "St. Mother Teresa CA, 440 Sewells Rd, Scarborough, ON" },
-      { name: "Madonna CSS", address: "Madonna Catholic Secondary School, 20 Cresswell Ave, North York, ON" },
-      { name: "St. Basil-the-Great", address: "St. Basil-the-Great College, 20 Weston Rd, North York, ON" },
-      { name: "Maria Goretti", address: "Maria Goretti Catholic School, 21 Tabor Rd, Scarborough, ON" }
+      { name: "Chaminade College", address: "Chaminade College School, 490 Queen's Dr, North York, ON", board: "TCDSB" },
+      { name: "CEC Board Office", address: "80 Sheppard Ave E, North York, ON M2N 6E8", board: "TCDSB" },
+      { name: "St. John Paul II", address: "St. John Paul II CSS, 685 Military Trail, Scarborough, ON", board: "TCDSB" },
+      { name: "St. Columba", address: "St. Columba Catholic School, 1054 Military Trail, Scarborough, ON", board: "TCDSB" },
+      { name: "St. Mother Teresa", address: "St. Mother Teresa CA, 440 Sewells Rd, Scarborough, ON", board: "TCDSB" },
+      { name: "Madonna CSS", address: "Madonna Catholic Secondary School, 20 Cresswell Ave, North York, ON", board: "TCDSB" },
+      { name: "St. Basil-the-Great", address: "St. Basil-the-Great College, 20 Weston Rd, North York, ON", board: "TCDSB" },
+      { name: "Maria Goretti", address: "Maria Goretti Catholic School, 21 Tabor Rd, Scarborough, ON", board: "TCDSB" }
     ];
 
     let currentOrigin = null; // null = default home, or { name: string, address: string }
@@ -1303,6 +1303,17 @@
       });
     }
 
+    function isTcdsbSchool(item) {
+      if (!item) return false;
+      if (item.board === "TCDSB") return true;
+      const combined = `${item.name || ""} ${item.address || ""}`.toLowerCase();
+      const keywords = [
+        "st.", "st ", "catholic", "css", "chaminade", "madonna", 
+        "basil", "cec", "goretti", "agatha", "nicholas", "paul"
+      ];
+      return keywords.some(k => combined.includes(k));
+    }
+
     async function executeTorontoSearch(query) {
       const resultsContainer = document.getElementById("autocompleteResults");
       const normalizedQuery = query.toLowerCase();
@@ -1331,51 +1342,86 @@
         console.warn("Geocoder fallback to local query:", err);
       }
 
-      const combined = [...localMatches, ...externalResults].slice(0, 6);
+      // Deduplicate results
+      const seen = new Set();
+      const deduped = [];
+      for (const item of [...localMatches, ...externalResults]) {
+        const key = `${item.name}|${item.address}`.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(item);
+        }
+      }
+
+      // Cap to maximum 3 results for mobile ergonomic space
+      const combined = deduped.slice(0, 3);
 
       if (combined.length === 0) {
+        const safeQuery = query.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         resultsContainer.innerHTML = `
-          <div class="p-3.5 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-2 transition">
-            <div onclick="addStop('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" class="flex-1 min-w-0 pr-2">
-              <div class="font-medium text-white truncate">${query}</div>
-              <div class="text-xs text-slate-400">Add waypoint with Toronto, ON bias</div>
-            </div>
-            <button 
-              type="button" 
-              onclick="event.stopPropagation(); setOriginLocation('${query.replace(/'/g, "\\'")}', '${query.replace(/'/g, "\\'")}, Toronto, ON, Canada')" 
-              class="min-h-[38px] text-xs text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] px-3 py-1.5 rounded-xl shrink-0"
-            >
-              Set Start
-            </button>
-          </div>
-        `;
-      } else {
-        resultsContainer.innerHTML = combined.map(item => `
-          <div class="p-3 px-3.5 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-2 transition">
-            <div onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" class="min-w-0 pr-2 flex-1">
-              <div class="font-medium text-white truncate text-[14px]">${item.name}</div>
-              <div class="text-xs text-slate-400 truncate">${item.address}</div>
+          <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
+            <div onclick="addStop('${safeQuery}', '${safeQuery}, Toronto, ON, Canada')" class="flex-1 min-w-0 pr-1">
+              <div class="font-medium text-white text-[14px] leading-snug">${query}</div>
+              <div class="text-xs text-slate-400 leading-relaxed break-words mt-0.5">Add waypoint with Toronto, ON bias</div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <button 
                 type="button" 
-                onclick="event.stopPropagation(); setOriginLocation('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" 
-                class="min-h-[38px] text-xs text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] px-2.5 py-1 rounded-xl"
-                title="Use as starting point for this trip"
+                onclick="event.stopPropagation(); setOriginLocation('${safeQuery}', '${safeQuery}, Toronto, ON, Canada')" 
+                class="min-h-[40px] text-xs font-medium text-slate-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.22] px-3 py-1.5 rounded-xl transition active:scale-95"
               >
                 Set Start
               </button>
               <button 
                 type="button" 
-                onclick="addStop('${item.name.replace(/'/g, "\\'")}', '${item.address.replace(/'/g, "\\'")}')" 
-                class="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white font-semibold flex items-center justify-center"
+                onclick="event.stopPropagation(); addStop('${safeQuery}', '${safeQuery}, Toronto, ON, Canada')" 
+                class="min-h-[40px] min-w-[40px] w-10 h-10 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 text-brand-300 hover:text-white font-semibold flex items-center justify-center transition active:scale-95"
                 title="Add stop"
               >
-                +
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
               </button>
             </div>
           </div>
-        `).join("");
+        `;
+      } else {
+        resultsContainer.innerHTML = combined.map(item => {
+          const safeName = item.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          const safeAddr = item.address.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+          const isCatholic = isTcdsbSchool(item);
+          const tcdsbBadge = isCatholic 
+            ? `<span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">TCDSB</span>`
+            : "";
+
+          return `
+            <div class="p-3.5 px-4 text-sm text-slate-200 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between gap-3.5 transition group">
+              <div onclick="addStop('${safeName}', '${safeAddr}')" class="flex-1 min-w-0 pr-1">
+                <div class="font-medium text-white text-[14px] leading-snug flex items-center flex-wrap gap-1">
+                  <span>${item.name}</span>
+                  ${tcdsbBadge}
+                </div>
+                <div class="text-xs text-slate-400 leading-relaxed break-words mt-0.5">${item.address}</div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button 
+                  type="button" 
+                  onclick="event.stopPropagation(); setOriginLocation('${safeName}', '${safeAddr}')" 
+                  class="min-h-[40px] text-xs font-medium text-slate-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.22] px-3 py-1.5 rounded-xl transition active:scale-95"
+                  title="Use as starting point for this trip"
+                >
+                  Set Start
+                </button>
+                <button 
+                  type="button" 
+                  onclick="event.stopPropagation(); addStop('${safeName}', '${safeAddr}')" 
+                  class="min-h-[40px] min-w-[40px] w-10 h-10 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/40 text-brand-300 hover:text-white font-semibold flex items-center justify-center transition active:scale-95"
+                  title="Add stop"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
       }
 
       resultsContainer.classList.remove("hidden");
