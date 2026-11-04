@@ -1,0 +1,1040 @@
+[
+  {
+    "name": "CEC Board Office",
+    "address": "80 Sheppard Ave E",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. John Paul II CSS",
+    "address": "685 Military Trail",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Mother Teresa Catholic Academy",
+    "address": "440 Sewells Rd",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Chaminade College School",
+    "address": "490 Queens Dr",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Basil-the-Great College",
+    "address": "20 Weston Rd",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Madonna Catholic Secondary School",
+    "address": "20 Cresswell Ave",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Joan of Arc Catholic Academy",
+    "address": "959 Midland Ave",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Notre Dame High School",
+    "address": "12 Malvern Ave",
+    "city": "Toronto",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Mary Catholic Academy",
+    "address": "66 Dufferin Park Ave",
+    "city": "Toronto",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Patrick Catholic Secondary School",
+    "address": "49 Felstead Ave",
+    "city": "Toronto",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Neil McNeil Catholic Secondary School",
+    "address": "127 Victoria Park Ave",
+    "city": "Toronto",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Francis Libermann Catholic High School",
+    "address": "4640 Finch Ave E",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. John Henry Newman CSS",
+    "address": "100 Brimley Rd S",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Senator O'Connor College School",
+    "address": "60 Rowena Dr",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Brebeuf College School",
+    "address": "211 Steeles Ave E",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Joseph's College School",
+    "address": "74 Wellesley St W",
+    "city": "Toronto",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Joseph's Morrow Park CSS",
+    "address": "3379 Bayview Ave",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Dante Alighieri Academy",
+    "address": "60 Playfair Ave",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Bishop Allen Academy",
+    "address": "721 Royal York Rd",
+    "city": "Etobicoke",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Father John Redmond CSS",
+    "address": "28 Colonel Samuel Smith Park Dr",
+    "city": "Etobicoke",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Michael Power/St. Joseph High School",
+    "address": "105 Eringate Dr",
+    "city": "Etobicoke",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Monsignor Percy Johnson CSS",
+    "address": "2170 Kipling Ave",
+    "city": "Etobicoke",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Marshall McLuhan Catholic Secondary School",
+    "address": "1107 Avenue Rd",
+    "city": "Toronto",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Loretto Abbey Catholic Secondary School",
+    "address": "101 Mason Blvd",
+    "city": "North York",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Columba Catholic School",
+    "address": "1054 Military Trail",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "St. Agatha Catholic School",
+    "address": "1095 Cathedral Bluffs Dr",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "Maria Goretti Catholic School",
+    "address": "21 Tabor Rd",
+    "city": "Scarborough",
+    "board": "TCDSB"
+  },
+  {
+    "name": "TDSB Head Office",
+    "address": "5050 Yonge St",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "West Hill Collegiate Institute",
+    "address": "350 Morningside Ave",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Birchmount Park Collegiate Institute",
+    "address": "3663 Danforth Ave",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "David and Mary Thomson CI",
+    "address": "125 Brockley Dr",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Agincourt Collegiate Institute",
+    "address": "2621 Midland Ave",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Wexford Collegiate School for the Arts",
+    "address": "1176 Pharmacy Ave",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Sir Wilfrid Laurier CI",
+    "address": "145 Guildwood Pkwy",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Woburn Collegiate Institute",
+    "address": "2222 Ellesmere Rd",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Cedarbrae Collegiate Institute",
+    "address": "550 Markham Rd",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Albert Campbell Collegiate Institute",
+    "address": "1550 Sandhurst Cir",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "Stephen Leacock Collegiate Institute",
+    "address": "2450 Birchmount Rd",
+    "city": "Scarborough",
+    "board": "TDSB"
+  },
+  {
+    "name": "John Polanyi Collegiate Institute",
+    "address": "640 Lawrence Ave W",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Earl Haig Secondary School",
+    "address": "100 Princess Ave",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Northview Heights Secondary School",
+    "address": "550 Finch Ave W",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "York Mills Collegiate Institute",
+    "address": "490 York Mills Rd",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Don Mills Collegiate Institute",
+    "address": "15 The Donway E",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Victoria Park Collegiate Institute",
+    "address": "15 Wallingford Rd",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Newtonbrook Secondary School",
+    "address": "155 Hilda Ave",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "George S. Henry Academy",
+    "address": "200 Graydon Hall Dr",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "C.W. Jefferys Collegiate Institute",
+    "address": "340 Sentinel Rd",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Downsview Secondary School",
+    "address": "7 Hawksdale Rd",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Central Technical School",
+    "address": "725 Bathurst St",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Central Toronto Academy",
+    "address": "570 Shaw St",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Harbord Collegiate Institute",
+    "address": "286 Harbord St",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Jarvis Collegiate Institute",
+    "address": "495 Jarvis St",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Malvern Collegiate Institute",
+    "address": "55 Malvern Ave",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Northern Secondary School",
+    "address": "851 Mount Pleasant Rd",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Oakwood Collegiate Institute",
+    "address": "991 St Clair Ave W",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Parkdale Collegiate Institute",
+    "address": "209 Jameson Ave",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Riverdale Collegiate Institute",
+    "address": "1094 Gerrard St E",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Rosedale Heights School of the Arts",
+    "address": "711 Bloor St E",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "Danforth Collegiate and Technical Institute",
+    "address": "800 Greenwood Ave",
+    "city": "Toronto",
+    "board": "TDSB"
+  },
+  {
+    "name": "East York Collegiate Institute",
+    "address": "650 Cosburn Ave",
+    "city": "East York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Marc Garneau Collegiate Institute",
+    "address": "135 Overlea Blvd",
+    "city": "North York",
+    "board": "TDSB"
+  },
+  {
+    "name": "Etobicoke Collegiate Institute",
+    "address": "86 Montgomery Rd",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "Etobicoke School of the Arts",
+    "address": "675 Royal York Rd",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "Martingrove Collegiate Institute",
+    "address": "50 Winterton Dr",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "Richview Collegiate Institute",
+    "address": "1738 Islington Ave",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "Silverthorn Collegiate Institute",
+    "address": "291 Mill Rd",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "Lakeshore Collegiate Institute",
+    "address": "350 Kipling Ave",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "Kipling Collegiate Institute",
+    "address": "380 The Westway",
+    "city": "Etobicoke",
+    "board": "TDSB"
+  },
+  {
+    "name": "DPCDSB Catholic Education Centre",
+    "address": "40 Matheson Blvd W",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Francis Xavier Secondary School",
+    "address": "50 Bristol Rd W",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Father Michael Goetz Secondary School",
+    "address": "330 Central Pkwy W",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Joan of Arc CSS",
+    "address": "3801 Thomas St",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Joseph Secondary School",
+    "address": "5555 Creditview Rd",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Marcellinus Secondary School",
+    "address": "730 Courtneypark Dr W",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Martin Secondary School",
+    "address": "2470 Rosemary Dr",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Aloysius Gonzaga Secondary School",
+    "address": "2800 Erin Centre Blvd",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Paul Secondary School",
+    "address": "815 Atwater Ave",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Philip Pocock Catholic Secondary School",
+    "address": "4555 Tomken Rd",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Loyola Catholic Secondary School",
+    "address": "4010 Sladeview Crescent",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "John Cabot Catholic Secondary School",
+    "address": "635 Nicollet Crt",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Holy Cross Catholic Secondary School",
+    "address": "2115 Rexwood Rd",
+    "city": "Mississauga",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Notre Dame CSS",
+    "address": "2 Notre Dame Ave",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Roch Catholic Secondary School",
+    "address": "200 Valleyway Dr",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Augustine Catholic Secondary School",
+    "address": "27 Drinkwater Rd",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Thomas Aquinas Secondary School",
+    "address": "25 Corporation Dr",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Cardinal Leger Secondary School",
+    "address": "75 Mary St",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Cardinal Ambrozic Catholic Secondary School",
+    "address": "10 Bouviers Way",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "St. Marguerite d'Youville Secondary School",
+    "address": "10815 Dixie Rd",
+    "city": "Brampton",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "Robert F. Hall Catholic Secondary School",
+    "address": "6500 Old Church Rd",
+    "city": "Caledon East",
+    "board": "DPCDSB"
+  },
+  {
+    "name": "PDSB Board Office",
+    "address": "5650 Hurontario St",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Mississauga Secondary School",
+    "address": "550 Courtneypark Dr W",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Meadowvale Secondary School",
+    "address": "6700 Meadowvale Town Centre Cir",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Cawthra Park Secondary School",
+    "address": "1305 Cawthra Rd",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Applewood Heights Secondary School",
+    "address": "945 Bloor St",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Glenforest Secondary School",
+    "address": "3575 Fieldgate Dr",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Port Credit Secondary School",
+    "address": "70 Mineola Rd E",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Rick Hansen Secondary School",
+    "address": "1150 Dream Crest Rd",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Streetsville Secondary School",
+    "address": "72 Joymar Dr",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "The Woodlands School",
+    "address": "3225 Erindale Station Rd",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Clarkson Secondary School",
+    "address": "2524 Bromsgrove Rd",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "John Fraser Secondary School",
+    "address": "2665 Erin Centre Blvd",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Stephen Lewis Secondary School",
+    "address": "3615 Thomas St",
+    "city": "Mississauga",
+    "board": "PDSB"
+  },
+  {
+    "name": "Central Peel Secondary School",
+    "address": "32 Kennedy Rd N",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Brampton Centennial Secondary School",
+    "address": "251 McMurchy Ave S",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Fletcher's Meadow Secondary School",
+    "address": "1075 Chinguacousy Rd",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Bramalea Secondary School",
+    "address": "510 Balmoral Dr",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Chinguacousy Secondary School",
+    "address": "1370 Williams Pkwy",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Heart Lake Secondary School",
+    "address": "296 Conestoga Dr",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "North Park Secondary School",
+    "address": "10 North Park Dr",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Turner Fenton Secondary School",
+    "address": "7935 Kennedy Rd S",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Sandalwood Heights Secondary School",
+    "address": "2671 Sandalwood Pkwy E",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Castlebrooke Secondary School",
+    "address": "10 Gardenbrooke Trail",
+    "city": "Brampton",
+    "board": "PDSB"
+  },
+  {
+    "name": "Mayfield Secondary School",
+    "address": "5000 Mayfield Rd",
+    "city": "Caledon",
+    "board": "PDSB"
+  },
+  {
+    "name": "DCDSB Catholic Education Centre",
+    "address": "650 Rossland Rd W",
+    "city": "Oshawa",
+    "board": "DCDSB"
+  },
+  {
+    "name": "St. Mary CSS",
+    "address": "1918 Whites Rd",
+    "city": "Pickering",
+    "board": "DCDSB"
+  },
+  {
+    "name": "Notre Dame CSS",
+    "address": "1375 Harwood Ave N",
+    "city": "Ajax",
+    "board": "DCDSB"
+  },
+  {
+    "name": "Father Leo J. Austin CSS",
+    "address": "1020 Dryden Blvd",
+    "city": "Whitby",
+    "board": "DCDSB"
+  },
+  {
+    "name": "All Saints Catholic Secondary School",
+    "address": "3001 Country Ln",
+    "city": "Whitby",
+    "board": "DCDSB"
+  },
+  {
+    "name": "Monsignor Paul Dwyer Catholic High School",
+    "address": "700 Stevenson Rd N",
+    "city": "Oshawa",
+    "board": "DCDSB"
+  },
+  {
+    "name": "Monsignor John Pereyma CSS",
+    "address": "316 Conant St",
+    "city": "Oshawa",
+    "board": "DCDSB"
+  },
+  {
+    "name": "St. Joseph Catholic School",
+    "address": "635 Tobermory Rd",
+    "city": "Ajax",
+    "board": "DCDSB"
+  },
+  {
+    "name": "DDSB Education Centre",
+    "address": "400 Taunton Rd E",
+    "city": "Whitby",
+    "board": "DDSB"
+  },
+  {
+    "name": "Pine Ridge Secondary School",
+    "address": "2155 Liverpool Rd",
+    "city": "Pickering",
+    "board": "DDSB"
+  },
+  {
+    "name": "Dunbarton High School",
+    "address": "655 Sheppard Ave",
+    "city": "Pickering",
+    "board": "DDSB"
+  },
+  {
+    "name": "Pickering High School",
+    "address": "180 Church St N",
+    "city": "Ajax",
+    "board": "DDSB"
+  },
+  {
+    "name": "J. Clarke Richardson Collegiate",
+    "address": "1355 Harwood Ave N",
+    "city": "Ajax",
+    "board": "DDSB"
+  },
+  {
+    "name": "Ajax High School",
+    "address": "105 Bayly St E",
+    "city": "Ajax",
+    "board": "DDSB"
+  },
+  {
+    "name": "Anderson Collegiate Vocational Institute",
+    "address": "400 Anderson St",
+    "city": "Whitby",
+    "board": "DDSB"
+  },
+  {
+    "name": "Brooklin High School",
+    "address": "20 Carnwith Dr W",
+    "city": "Whitby",
+    "board": "DDSB"
+  },
+  {
+    "name": "Donald A. Wilson Secondary School",
+    "address": "681 Rossland Rd W",
+    "city": "Whitby",
+    "board": "DDSB"
+  },
+  {
+    "name": "Henry Street High School",
+    "address": "600 Henry St",
+    "city": "Whitby",
+    "board": "DDSB"
+  },
+  {
+    "name": "Sinclair Secondary School",
+    "address": "380 Taunton Rd E",
+    "city": "Whitby",
+    "board": "DDSB"
+  },
+  {
+    "name": "Eastdale Collegiate Institute",
+    "address": "265 Harmony Rd N",
+    "city": "Oshawa",
+    "board": "DDSB"
+  },
+  {
+    "name": "Maxwell Heights Secondary School",
+    "address": "1100 Coldstream Dr",
+    "city": "Oshawa",
+    "board": "DDSB"
+  },
+  {
+    "name": "O'Neill Collegiate and Vocational Institute",
+    "address": "301 Simcoe St N",
+    "city": "Oshawa",
+    "board": "DDSB"
+  },
+  {
+    "name": "R.S. McLaughlin Collegiate and Vocational Institute",
+    "address": "570 Stevenson Rd N",
+    "city": "Oshawa",
+    "board": "DDSB"
+  },
+  {
+    "name": "YCDSB Catholic Education Centre",
+    "address": "320 Bloomington Rd W",
+    "city": "Aurora",
+    "board": "YCDSB"
+  },
+  {
+    "name": "Father Michael McGivney Catholic Academy",
+    "address": "5300 14th Ave",
+    "city": "Markham",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Brother André Catholic High School",
+    "address": "6160 16th Ave",
+    "city": "Markham",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Robert Catholic High School",
+    "address": "8101 Leslie St",
+    "city": "Thornhill",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Augustine Catholic High School",
+    "address": "2188 Rodick Rd",
+    "city": "Markham",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Joan of Arc Catholic High School",
+    "address": "1 St Joan of Arc Ave",
+    "city": "Maple",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Elizabeth Catholic High School",
+    "address": "525 New Westminster Dr",
+    "city": "Thornhill",
+    "board": "YCDSB"
+  },
+  {
+    "name": "Holy Cross Catholic Academy",
+    "address": "7505 Martin Grove Rd",
+    "city": "Woodbridge",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Katharine Drexel CHS",
+    "address": "4710 19th Ave",
+    "city": "Markham",
+    "board": "YCDSB"
+  },
+  {
+    "name": "Sacred Heart Catholic High School",
+    "address": "259 Muriel St",
+    "city": "Newmarket",
+    "board": "YCDSB"
+  },
+  {
+    "name": "Cardinal Carter Catholic High School",
+    "address": "210 Bloomington Rd",
+    "city": "Aurora",
+    "board": "YCDSB"
+  },
+  {
+    "name": "St. Theresa of Lisieux CHS",
+    "address": "230 Shaftsbury Ave",
+    "city": "Richmond Hill",
+    "board": "YCDSB"
+  },
+  {
+    "name": "Our Lady of the Lake CCS",
+    "address": "185 Glenwoods Ave",
+    "city": "Keswick",
+    "board": "YCDSB"
+  },
+  {
+    "name": "YRDSB Education Centre",
+    "address": "60 Wellington St W",
+    "city": "Aurora",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Milliken Mills High School",
+    "address": "7522 Kennedy Rd",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Markham District High School",
+    "address": "89 Church St",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Middlefield Collegiate Institute",
+    "address": "525 Highglen Ave",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Unionville High School",
+    "address": "201 Town Centre Blvd",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Markville Secondary School",
+    "address": "1000 Carlton Rd",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Pierre Elliott Trudeau High School",
+    "address": "90 Bur Oak Ave",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Bur Oak Secondary School",
+    "address": "933 Bur Oak Ave",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Bill Hogarth Secondary School",
+    "address": "100 Donald Sim Ave",
+    "city": "Markham",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Richmond Green Secondary School",
+    "address": "1 Elgin Mills Rd E",
+    "city": "Richmond Hill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Richmond Hill High School",
+    "address": "201 Yorkland St",
+    "city": "Richmond Hill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Alexander Mackenzie High School",
+    "address": "300 Major Mackenzie Dr W",
+    "city": "Richmond Hill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Bayview Secondary School",
+    "address": "10077 Bayview Ave",
+    "city": "Richmond Hill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Langstaff Secondary School",
+    "address": "106 Garden Ave",
+    "city": "Richmond Hill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Thornhill Secondary School",
+    "address": "167 Dudley Ave",
+    "city": "Thornhill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Thornlea Secondary School",
+    "address": "8075 Bayview Ave",
+    "city": "Thornhill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Westmount Collegiate Institute",
+    "address": "1000 New Westminster Dr",
+    "city": "Thornhill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Stephen Lewis Secondary School",
+    "address": "555 Autumn Hill Dr",
+    "city": "Thornhill",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Woodbridge College",
+    "address": "71 Bruce St",
+    "city": "Woodbridge",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Maple High School",
+    "address": "50 Richard L. Kaufman Dr",
+    "city": "Maple",
+    "board": "YRDSB"
+  },
+  {
+    "name": "Tommy Douglas Secondary School",
+    "address": "4020 Major Mackenzie Dr",
+    "city": "Woodbridge",
+    "board": "YRDSB"
+  },
+  {
+    "name": "John Street Roundhouse",
+    "address": "255 Bremner Blvd",
+    "city": "Toronto",
+    "board": "GTA"
+  },
+  {
+    "name": "Toronto City Hall",
+    "address": "100 Queen St W",
+    "city": "Toronto",
+    "board": "GTA"
+  },
+  {
+    "name": "Metro Hall",
+    "address": "55 John St",
+    "city": "Toronto",
+    "board": "GTA"
+  }
+]
