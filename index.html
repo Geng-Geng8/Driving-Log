@@ -492,14 +492,14 @@
     <!-- ============================================================ -->
     <div id="logTripView" class="space-y-4">
 
-    <!-- Frequent GTA Schools Quick Add -->
+    <!-- Recent Schools Quick Add -->
     <section class="space-y-2">
       <div class="flex items-center justify-between px-0.5">
-        <span class="micro-label">Frequent Schools (GTA)</span>
-        <button onclick="resetDefaultSchools()" class="text-xs font-medium text-slate-400 hover:text-slate-200 px-2 py-1 -mr-2 rounded-lg">Reset</button>
+        <span class="micro-label">Recent Schools</span>
+        <button onclick="resetRecentSchools()" class="text-xs font-medium text-slate-400 hover:text-slate-200 px-2 py-1 -mr-2 rounded-lg">Reset</button>
       </div>
-      <div id="frequentChips" class="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
-        <!-- Rendered by JS with 48px ergonomic height -->
+      <div id="frequentChips" data-id="recentSchoolsChips" class="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+        <!-- Rendered dynamically by JS with 48px ergonomic height -->
       </div>
     </section>
 
@@ -1314,35 +1314,123 @@
     }
 
     // -------------------------------------------------------------
-    // FREQUENT SCHOOLS BAR (48px Ergonomic Slate Chips)
+    // DYNAMIC RECENT SCHOOLS BAR (PULLED FROM GOOGLE SHEET TRIPS)
     // -------------------------------------------------------------
-    function renderFrequentChips() {
-      const container = document.getElementById("frequentChips");
+    const DEFAULT_STARTER_SCHOOLS = [
+      { name: "Chaminade College", address: "490 Queen's Dr", city: "North York", board: "TCDSB" },
+      { name: "CEC Board Office", address: "80 Sheppard Ave E", city: "North York", board: "TCDSB" }
+    ];
+
+    function getRecentSchoolsFromTrips(trips, maxCount = 6) {
+      const recentList = [];
+      const seen = new Set();
+
+      const tripSource = Array.isArray(trips) ? trips : (() => {
+        try {
+          const raw = localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      })();
+
+      const dataset = (Array.isArray(window.LOCAL_SCHOOLS) && window.LOCAL_SCHOOLS.length > 0)
+        ? window.LOCAL_SCHOOLS
+        : PRESET_SCHOOLS;
+
+      // trips are already sorted newest first
+      (tripSource || []).forEach(trip => {
+        const routeStr = trip.route || trip.rawRoute || "";
+        if (!routeStr) return;
+
+        // Split route by arrow delimiters
+        const stops = String(routeStr).split(/\s*[-—→>]+\s*|\s+to\s+/i).map(s => s.trim()).filter(Boolean);
+
+        stops.forEach(stopName => {
+          const lower = stopName.toLowerCase();
+          // Ignore home base and generic circuit names
+          if (
+            lower === "home" ||
+            lower === "start" ||
+            lower.includes("home base") ||
+            lower.includes("circuit") ||
+            lower.includes("strand") ||
+            lower.includes("dalmatian") ||
+            seen.has(lower)
+          ) {
+            return;
+          }
+
+          seen.add(lower);
+
+          // Match against window.LOCAL_SCHOOLS / dataset for exact address, board badge, and city
+          const matchedSchool = (dataset || []).find(s =>
+            s.name.toLowerCase() === lower ||
+            s.name.toLowerCase().includes(lower) ||
+            lower.includes(s.name.toLowerCase())
+          );
+
+          recentList.push(matchedSchool || {
+            name: stopName,
+            address: "",
+            city: "",
+            board: "GTA"
+          });
+        });
+      });
+
+      return recentList.slice(0, maxCount);
+    }
+
+    function renderRecentSchoolsChips(trips = null) {
+      const container = document.getElementById("recentSchoolsChips") || document.getElementById("frequentChips");
       if (!container) return;
 
-      const chipsList = PRESET_SCHOOLS.filter(s => s.frequent);
-      const listToRender = chipsList.length ? chipsList : PRESET_SCHOOLS.slice(0, 8);
+      const schools = getRecentSchoolsFromTrips(trips);
+      const listToRender = schools.length > 0 ? schools : DEFAULT_STARTER_SCHOOLS;
 
       container.innerHTML = listToRender.map(school => {
-        const fullAddr = getFullAddress(school);
-        const isSelected = currentStops.some(s => s.name === school.name);
+        const fullAddr = getFullAddress(school) || (school.address ? `${school.address}, ${school.city || 'Toronto'}, ON` : `${school.name}, Toronto, ON, Canada`);
+        const isSelected = currentStops.some(s => s.name.toLowerCase() === school.name.toLowerCase());
+        const safeName = school.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const safeFullAddr = fullAddr.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const boardBadge = getSchoolBoardBadge(school.board || "GTA");
+
         return `
           <button 
             type="button"
-            onclick="addStop('${school.name.replace(/'/g, "\\'")}', '${fullAddr.replace(/'/g, "\\'")}')" 
-            class="shrink-0 chip-slate ${isSelected ? 'is-selected' : ''}"
+            onclick="addStop('${safeName}', '${safeFullAddr}')" 
+            class="shrink-0 chip-slate ${isSelected ? 'is-selected' : ''} flex items-center gap-1.5"
             title="${fullAddr.replace(/"/g, '&quot;')}"
           >
-            <svg class="w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'} shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span>${school.name}</span>
+            <svg class="w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'} shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span class="font-medium text-slate-100">${school.name}</span>
+            ${boardBadge}
           </button>
         `;
       }).join("");
     }
 
+    // Aliases to ensure backward-compatibility across all callers
+    function renderFrequentChips(trips = null) {
+      renderRecentSchoolsChips(trips);
+    }
+
+    function updateRecentSchoolsFromTrips(trips = null) {
+      renderRecentSchoolsChips(trips);
+    }
+
+    function resetRecentSchools() {
+      renderRecentSchoolsChips();
+      showAlert("Recent schools refreshed.", "info");
+    }
+
     function resetDefaultSchools() {
-      renderFrequentChips();
-      showAlert("Frequent schools reset.", "info");
+      resetRecentSchools();
     }
 
     // -------------------------------------------------------------
@@ -1379,6 +1467,7 @@
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             window.LOCAL_SCHOOLS = data;
+            updateRecentSchoolsFromTrips();
             return;
           }
         }
@@ -1694,6 +1783,7 @@
           }
           renderRecentDrives(data.trips, data.totalKm);
           renderTaxDashboard();
+          updateRecentSchoolsFromTrips(data.trips);
           updateConnectionStatus(true, "Sheet Synced");
           if (syncBanner) syncBanner.classList.add("hidden");
           if (showFeedback) showAlert(`✓ Synced ${data.trips.length} drives from Google Sheet!`, "success");
@@ -2062,6 +2152,7 @@
       localStorage.setItem("driving_log_history", JSON.stringify(trimmed));
       renderRecentDrives();
       renderTaxDashboard();
+      updateRecentSchoolsFromTrips(trimmed);
     }
 
     function formatTripDate(raw) {
