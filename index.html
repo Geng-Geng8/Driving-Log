@@ -933,6 +933,66 @@
     </div>
   </div>
 
+  <!-- Keyboard-Armored Mobile Edit Bottom Sheet -->
+  <div 
+    id="editTripModal" 
+    class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity duration-200"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="editTripModalTitle"
+  >
+    <div class="w-full max-w-lg bg-slate-900 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl">
+      <!-- Fixed Header -->
+      <div class="px-4 py-3.5 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          <h3 id="editTripModalTitle" class="text-sm font-semibold text-white">Edit Trip</h3>
+        </div>
+        <button type="button" onclick="closeEditTripModal()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white rounded-lg transition" aria-label="Close edit modal">✕</button>
+      </div>
+
+      <!-- Scrollable Content -->
+      <form id="editTripForm" onsubmit="event.preventDefault(); saveEditedTrip();" class="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain">
+        <input type="hidden" id="editTripId" value="">
+
+        <div>
+          <label for="editTripDate" class="block text-xs font-medium text-slate-400 mb-1">Date</label>
+          <input type="date" id="editTripDate" required class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]">
+        </div>
+
+        <div>
+          <label for="editTripRoute" class="block text-xs font-medium text-slate-400 mb-1">Route Summary</label>
+          <input type="text" id="editTripRoute" required class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]" placeholder="e.g. Precious Blood → Maria Goretti → Home">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="editTripKm" class="block text-xs font-medium text-slate-400 mb-1">Distance (KM)</label>
+            <input type="number" id="editTripKm" step="0.1" min="0" required class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]" placeholder="0.0">
+          </div>
+          <div>
+            <label for="editTripStops" class="block text-xs font-medium text-slate-400 mb-1">Stop Count</label>
+            <input type="number" id="editTripStops" step="1" min="1" required class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]" placeholder="2">
+          </div>
+        </div>
+
+        <div>
+          <label for="editTripNotes" class="block text-xs font-medium text-slate-400 mb-1">Purpose / Notes</label>
+          <input type="text" id="editTripNotes" class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]" placeholder="e.g. # SHSM Workshop, Site Visit">
+        </div>
+      </form>
+
+      <!-- Sticky Footer -->
+      <div class="sticky bottom-0 bg-slate-900/95 backdrop-blur-sm p-4 border-t border-slate-800 flex gap-2.5 shrink-0">
+        <button type="button" onclick="closeEditTripModal()" class="w-1/3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium active:scale-95 transition">Cancel</button>
+        <button type="button" id="saveEditTripBtn" onclick="saveEditedTrip()" class="w-2/3 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold active:scale-95 flex items-center justify-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span id="saveEditTripBtnText">Save Changes</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // -------------------------------------------------------------
     // CONFIGURATION DEFAULTS
@@ -1012,10 +1072,22 @@
       loadSettings();
       loadOdometerBaseline();
       renderOriginUI();
-      renderFrequentChips();
       renderStops();
-      renderRecentDrives(); // renders cached trips immediately
+
+      // Local-First Preload & 0ms Boot Architecture
+      let bootTrips = [];
+      try {
+        const rawCached = localStorage.getItem("cached_trips_data") || localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
+        bootTrips = JSON.parse(rawCached);
+        if (!Array.isArray(bootTrips)) bootTrips = [];
+      } catch (e) {
+        bootTrips = [];
+      }
+      recalculateHeaderMetrics(bootTrips);
+      renderRecentDrives(bootTrips);
       renderTaxDashboard();
+      updateRecentSchoolsFromTrips(bootTrips);
+
       updateOfflineQueueBadge();
       setupSearchListener();
       setupOriginInputListener();
@@ -1024,7 +1096,7 @@
       setupViewSwitcher();
       loadLocalSchools();
 
-      // Mirror live sheet data in background
+      // Mirror fresh Google Sheet data silently in the background
       syncWithGoogleSheet(false);
 
       window.addEventListener("online", () => {
@@ -1773,19 +1845,28 @@
         const data = await res.json();
 
         if (data.status === "success" && Array.isArray(data.trips)) {
-          // Google Sheet is the single source of truth! Cache locally on this device
-          localStorage.setItem("driving_log_history", JSON.stringify(data.trips.slice(0, 500)));
-          localStorage.setItem("driving_log_recent_trips", JSON.stringify(data.trips.slice(0, 500)));
+          // Zero-drift sync: save scroll position before updating
+          const prevScrollY = window.scrollY || document.documentElement.scrollTop;
+
+          // Google Sheet is the single source of truth! Cache raw trips locally
+          localStorage.setItem("cached_trips_data", JSON.stringify(data.trips));
+          localStorage.setItem("driving_log_history", JSON.stringify(data.trips));
+          localStorage.setItem("driving_log_recent_trips", JSON.stringify(data.trips));
           if (data.sheetUrl && typeof data.sheetUrl === "string") {
             localStorage.setItem("driving_log_sheet_url", data.sheetUrl);
             const sheetInput = document.getElementById("configSheetUrlInput");
             if (sheetInput && !sheetInput.value) sheetInput.value = data.sheetUrl;
           }
+          recalculateHeaderMetrics(data.trips);
           renderRecentDrives(data.trips, data.totalKm);
           renderTaxDashboard();
           updateRecentSchoolsFromTrips(data.trips);
           updateConnectionStatus(true, "Sheet Synced");
           if (syncBanner) syncBanner.classList.add("hidden");
+
+          // Restore scroll position silently without layout shift
+          window.scrollTo({ top: prevScrollY, behavior: "instant" });
+
           if (showFeedback) showAlert(`✓ Synced ${data.trips.length} drives from Google Sheet!`, "success");
         } else if (data.status === "healthy" && !data.trips) {
           // Running write-only template without doGet implementation
@@ -2177,7 +2258,7 @@
       let history = trips;
       if (!history) {
         try {
-          const raw = localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
+          const raw = localStorage.getItem("cached_trips_data") || localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
           history = JSON.parse(raw);
           if (!Array.isArray(history)) history = [];
         } catch (e) {
@@ -2210,7 +2291,11 @@
         return;
       }
 
-      feed.innerHTML = history.slice(0, 8).map(h => {
+      // Render 100% of historical transactions (no artificial cap)
+      feed.innerHTML = history.map((h, idx) => {
+        const tripId = h.id || h.tripId || ("ROW-" + (history.length - idx));
+        h.id = tripId;
+
         // 1. Column & Property Mapping: Prioritize clean route summary (Column D), avoid numeric stop count
         let routeText = "";
         if (h.route && typeof h.route === "string" && isNaN(Number(h.route.trim()))) {
@@ -2252,17 +2337,28 @@
           <div class="glass-card p-3.5 space-y-2.5">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0 flex-1">
-                <div class="text-[13px] font-semibold text-white leading-snug flex items-center flex-wrap gap-1.5">
+                <div class="text-sm font-semibold text-white break-words leading-snug flex items-center flex-wrap gap-1.5">
                   ${routeHtml}
-                  ${stopBadge}
                 </div>
               </div>
-              <div class="text-sm font-semibold text-emerald-400 shrink-0 tabular-nums">${formattedKm}</div>
+              <div class="flex items-center gap-2 shrink-0">
+                <div class="text-sm font-semibold text-emerald-400 tabular-nums">${formattedKm}</div>
+                <button 
+                  type="button" 
+                  onclick="openEditTripModal('${tripId}')" 
+                  class="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-800/90 text-slate-200 border border-slate-700 active:scale-95 hover:bg-slate-700 flex items-center gap-1.5 transition-all"
+                  title="Edit trip details"
+                >
+                  <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  Edit
+                </button>
+              </div>
             </div>
             <div class="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-white/[0.06]">
               <div class="flex items-center gap-1.5 truncate pr-2">
                 <span class="tabular-nums text-slate-300 font-medium">${formattedDate}</span>
                 ${h.notes && h.notes !== routeText ? `<span class="text-slate-600">•</span> <span class="text-slate-400 truncate">${h.notes}</span>` : ""}
+                ${stopBadge ? `<span class="text-slate-600">•</span> ${stopBadge}` : ""}
               </div>
               <div class="shrink-0 flex items-center gap-1.5">
                 ${h.synced !== false ? '<span class="text-emerald-400 text-[11px] font-medium flex items-center gap-1"><svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Synced</span>' : '<span class="text-amber-400 text-[11px] font-medium">Saved Offline</span>'}
@@ -2272,6 +2368,223 @@
         `;
       }).join("");
     }
+
+    // -------------------------------------------------------------
+    // TRANSACTION EDITOR & OPTIMISTIC ROLLBACK ENGINE
+    // -------------------------------------------------------------
+    let isSavingTrip = false;
+
+    function parseToISODate(raw) {
+      if (!raw) return new Date().toISOString().slice(0, 10);
+      const str = String(raw).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str;
+      }
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        return str.slice(0, 10);
+      }
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function recalculateHeaderMetrics(trips = null) {
+      let list = trips;
+      if (!list) {
+        try {
+          const raw = localStorage.getItem("cached_trips_data") || localStorage.getItem("driving_log_recent_trips") || "[]";
+          list = JSON.parse(raw);
+        } catch (e) {
+          list = [];
+        }
+      }
+      const totalKm = (Array.isArray(list) ? list : []).reduce((acc, h) => {
+        const val = Number(h && (h.totalKm !== undefined ? h.totalKm : h.km)) || 0;
+        return acc + val;
+      }, 0);
+      const totalDisplay = document.getElementById("sessionTotalKm");
+      if (totalDisplay) {
+        totalDisplay.innerText = `${totalKm.toFixed(1)} KM Logged`;
+      }
+      return totalKm;
+    }
+
+    function openEditTripModal(tripId) {
+      let trips = [];
+      try {
+        const raw = localStorage.getItem("cached_trips_data") || localStorage.getItem("driving_log_recent_trips") || localStorage.getItem("driving_log_history") || "[]";
+        trips = JSON.parse(raw);
+        if (!Array.isArray(trips)) trips = [];
+      } catch (e) {
+        trips = [];
+      }
+
+      const trip = trips.find(t => String(t.id || t.tripId) === String(tripId));
+      if (!trip) {
+        showAlert("Trip not found for editing.", "warning");
+        return;
+      }
+
+      document.getElementById("editTripId").value = tripId;
+      document.getElementById("editTripDate").value = parseToISODate(trip.date || trip.tripDate || trip.timestamp);
+      document.getElementById("editTripRoute").value = trip.route || trip.rawRoute || trip.stops || "";
+      const kmVal = Number(trip.totalKm !== undefined ? trip.totalKm : (trip.km !== undefined ? trip.km : 0)) || 0;
+      document.getElementById("editTripKm").value = kmVal.toFixed(1);
+      const stopsVal = parseInt(trip.stops !== undefined ? trip.stops : (trip.stopCount || 2), 10) || 2;
+      document.getElementById("editTripStops").value = stopsVal;
+      document.getElementById("editTripNotes").value = trip.notes || "";
+
+      const modal = document.getElementById("editTripModal");
+      if (modal) {
+        modal.classList.remove("hidden");
+        document.body.classList.add("overflow-hidden");
+      }
+    }
+
+    function closeEditTripModal() {
+      const modal = document.getElementById("editTripModal");
+      if (modal) {
+        modal.classList.add("hidden");
+        document.body.classList.remove("overflow-hidden");
+      }
+    }
+
+    async function saveEditedTrip() {
+      if (isSavingTrip) return;
+
+      const tripId = document.getElementById("editTripId").value;
+      const newDate = document.getElementById("editTripDate").value;
+      const newRoute = document.getElementById("editTripRoute").value.trim();
+      const newKm = parseFloat(document.getElementById("editTripKm").value) || 0;
+      const newStops = parseInt(document.getElementById("editTripStops").value, 10) || 1;
+      const newNotes = document.getElementById("editTripNotes").value.trim();
+
+      if (!tripId || !newDate || !newRoute) {
+        showAlert("Please fill in the date and route.", "warning");
+        return;
+      }
+
+      isSavingTrip = true;
+      const saveBtn = document.getElementById("saveEditTripBtn");
+      const saveBtnText = document.getElementById("saveEditTripBtnText");
+      if (saveBtn) saveBtn.disabled = true;
+      if (saveBtnText) saveBtnText.innerText = "Saving...";
+
+      // 1. Get cached trips and create snapshot for rollback
+      let trips = [];
+      try {
+        const raw = localStorage.getItem("cached_trips_data") || localStorage.getItem("driving_log_recent_trips") || "[]";
+        trips = JSON.parse(raw);
+        if (!Array.isArray(trips)) trips = [];
+      } catch (e) {
+        trips = [];
+      }
+
+      const tripIdx = trips.findIndex(t => String(t.id || t.tripId) === String(tripId));
+      if (tripIdx === -1) {
+        showAlert("Original trip record not found.", "warning");
+        isSavingTrip = false;
+        if (saveBtn) saveBtn.disabled = false;
+        if (saveBtnText) saveBtnText.innerText = "Save Changes";
+        return;
+      }
+
+      const originalTrip = JSON.parse(JSON.stringify(trips[tripIdx]));
+
+      // 2. Optimistic Mutation
+      trips[tripIdx] = {
+        ...trips[tripIdx],
+        id: tripId,
+        date: newDate,
+        route: newRoute,
+        totalKm: newKm,
+        km: newKm,
+        stops: newStops,
+        notes: newNotes,
+        synced: true
+      };
+
+      localStorage.setItem("cached_trips_data", JSON.stringify(trips));
+      localStorage.setItem("driving_log_recent_trips", JSON.stringify(trips));
+      localStorage.setItem("driving_log_history", JSON.stringify(trips));
+
+      recalculateHeaderMetrics(trips);
+      renderRecentDrives(trips);
+      renderTaxDashboard();
+      updateRecentSchoolsFromTrips(trips);
+
+      closeEditTripModal();
+      showAlert("Trip updated locally. Syncing with sheet...", "info");
+
+      // 3. CORS-Safe Network Dispatch
+      const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
+
+      try {
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "update",
+            id: tripId,
+            date: newDate,
+            route: newRoute,
+            totalKm: parseFloat(newKm),
+            notes: newNotes,
+            stops: parseInt(newStops, 10)
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result && (result.success === false || result.status === "error")) {
+          throw new Error(result.error || result.message || "Server rejected update");
+        }
+
+        showAlert("Trip updated & synced ✓", "success");
+      } catch (err) {
+        console.warn("Edit sync failed, rolling back:", err);
+        // 4. Rollback Engine
+        trips[tripIdx] = originalTrip;
+        localStorage.setItem("cached_trips_data", JSON.stringify(trips));
+        localStorage.setItem("driving_log_recent_trips", JSON.stringify(trips));
+        localStorage.setItem("driving_log_history", JSON.stringify(trips));
+
+        recalculateHeaderMetrics(trips);
+        renderRecentDrives(trips);
+        renderTaxDashboard();
+        updateRecentSchoolsFromTrips(trips);
+
+        showAlert("Sync failed. Reverted to original.", "error");
+      } finally {
+        isSavingTrip = false;
+        if (saveBtn) saveBtn.disabled = false;
+        if (saveBtnText) saveBtnText.innerText = "Save Changes";
+      }
+    }
+
+    // Window event listeners for closing the modal
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const modal = document.getElementById("editTripModal");
+        if (modal && !modal.classList.contains("hidden")) {
+          closeEditTripModal();
+        }
+      }
+    });
+
+    document.getElementById("editTripModal")?.addEventListener("click", (e) => {
+      if (e.target === document.getElementById("editTripModal")) {
+        closeEditTripModal();
+      }
+    });
 
     // -------------------------------------------------------------
     // TAX & REPORTS DASHBOARD (PURE CLIENT-SIDE AGGREGATION)

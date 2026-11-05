@@ -168,6 +168,68 @@ function doPost(e) {
       });
     }
 
+    // Support update action from the mobile transaction editor
+    if (payload.action === "update") {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+      const data = sheet.getDataRange().getValues();
+
+      if (data.length <= 1) {
+        return createJsonResponse({
+          success: false,
+          status: "error",
+          message: "No data rows found in sheet to update."
+        });
+      }
+
+      const headers = data[0].map(h => String(h || "").trim().toLowerCase());
+      let idIdx = headers.findIndex(h => h.includes("trip id") || h === "id");
+      let dateIdx = headers.findIndex(h => h === "date" || h.includes("trip date"));
+      let notesIdx = headers.findIndex(h => h.includes("note") || h.includes("purpose"));
+      let routeIdx = headers.findIndex(h => h.includes("route") || (h.includes("stop") && !h.includes("count")));
+      let stopsCountIdx = headers.findIndex(h => h === "stops" || h.includes("count"));
+      let kmIdx = headers.findIndex(h => h.includes("km") || h.includes("distance") || h.includes("mileage"));
+
+      if (idIdx === -1) idIdx = 0;
+      if (dateIdx === -1) dateIdx = 1;
+      if (notesIdx === -1) notesIdx = 2;
+      if (routeIdx === -1) routeIdx = 3;
+      if (stopsCountIdx === -1) stopsCountIdx = 4;
+      if (kmIdx === -1) kmIdx = 5;
+
+      const targetId = String(payload.id || "").trim();
+      let targetRowIndex = -1;
+
+      for (let i = 1; i < data.length; i++) {
+        const rowId = String(data[i][idIdx] || "").trim();
+        if (rowId === targetId || targetId === ("ROW-" + i)) {
+          targetRowIndex = i + 1; // 1-based index for getRange
+          break;
+        }
+      }
+
+      if (targetRowIndex === -1) {
+        return createJsonResponse({
+          success: false,
+          status: "error",
+          message: "Trip ID not found in sheet: " + targetId
+        });
+      }
+
+      if (payload.date !== undefined) sheet.getRange(targetRowIndex, dateIdx + 1).setValue(payload.date);
+      if (payload.notes !== undefined) sheet.getRange(targetRowIndex, notesIdx + 1).setValue(payload.notes);
+      if (payload.route !== undefined) sheet.getRange(targetRowIndex, routeIdx + 1).setValue(cleanRouteString(payload.route));
+      if (payload.stops !== undefined) sheet.getRange(targetRowIndex, stopsCountIdx + 1).setValue(payload.stops);
+      if (payload.totalKm !== undefined) sheet.getRange(targetRowIndex, kmIdx + 1).setValue(Math.round(parseFloat(payload.totalKm) * 10) / 10);
+
+      return createJsonResponse({
+        success: true,
+        status: "success",
+        message: "Trip updated successfully",
+        id: targetId
+      });
+    }
+
     const stops = payload.stops;
 
     if (!stops || !Array.isArray(stops) || stops.length < 2) {
