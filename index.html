@@ -1930,7 +1930,9 @@
             tripId: data.tripId || "SYNCED",
             date: selectedDate,
             km: data.totalKm,
-            stops: routeSummary,
+            totalKm: data.totalKm,
+            route: routeSummary,
+            stops: currentStops.length + 1,
             notes: note,
             synced: true
           });
@@ -1949,7 +1951,9 @@
           tripId: "OFFLINE",
           date: selectedDate,
           km: 0,
-          stops: routeSummary,
+          totalKm: 0,
+          route: routeSummary,
+          stops: currentStops.length + 1,
           notes: note,
           synced: false
         });
@@ -2060,6 +2064,24 @@
       renderTaxDashboard();
     }
 
+    function formatTripDate(raw) {
+      if (!raw) return "";
+      let dateInput = raw;
+      if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+        dateInput = raw.trim() + "T12:00:00";
+      }
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) {
+        return String(raw).split("T")[0];
+      }
+      return d.toLocaleDateString("en-CA", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+    }
+
     function renderRecentDrives(trips = null, totalKmOverride = null) {
       let history = trips;
       if (!history) {
@@ -2071,14 +2093,21 @@
           history = [];
         }
       }
-      const feed = document.getElementById("recentDrivesFeed");
+      const feed = document.getElementById("recentDrivesFeed") || document.getElementById("recentDrivesList");
       const totalDisplay = document.getElementById("sessionTotalKm");
 
       const totalKm = totalKmOverride !== null 
-        ? totalKmOverride 
-        : history.reduce((acc, h) => acc + (Number(h && h.km) || 0), 0);
+        ? Number(totalKmOverride) 
+        : history.reduce((acc, h) => {
+            const val = Number(h && (h.totalKm !== undefined ? h.totalKm : h.km)) || 0;
+            return acc + val;
+          }, 0);
 
-      totalDisplay.innerText = `${totalKm.toFixed(1)} KM Logged`;
+      if (totalDisplay) {
+        totalDisplay.innerText = `${totalKm.toFixed(1)} KM Logged`;
+      }
+
+      if (!feed) return;
 
       if (history.length === 0) {
         feed.innerHTML = `
@@ -2091,10 +2120,42 @@
       }
 
       feed.innerHTML = history.slice(0, 8).map(h => {
-        const rawRoute = h.stops || h.route || h.notes || "Trip";
-        const routeHtml = renderRouteHtml(rawRoute);
-        const formattedKm = Number(h.km) > 0 ? `${Number(h.km).toFixed(1)} km` : "—";
-        const dateStr = h.date || (h.timestamp ? String(h.timestamp).slice(0, 10) : "");
+        // 1. Column & Property Mapping: Prioritize clean route summary (Column D), avoid numeric stop count
+        let routeText = "";
+        if (h.route && typeof h.route === "string" && isNaN(Number(h.route.trim()))) {
+          routeText = h.route;
+        } else if (h.rawRoute && typeof h.rawRoute === "string" && isNaN(Number(h.rawRoute.trim()))) {
+          routeText = h.rawRoute;
+        } else if (h.notes && typeof h.notes === "string" && isNaN(Number(h.notes.trim())) && (h.notes.includes("→") || h.notes.includes("->"))) {
+          routeText = h.notes;
+        } else if (h.stops && typeof h.stops === "string" && isNaN(Number(h.stops.trim()))) {
+          routeText = h.stops;
+        } else if (h.notes && typeof h.notes === "string" && isNaN(Number(h.notes.trim()))) {
+          routeText = h.notes;
+        } else {
+          routeText = "Trip";
+        }
+
+        const routeHtml = renderRouteHtml(routeText);
+
+        // Optional secondary stop count badge
+        const stopNum = Number(h.stops !== undefined ? h.stops : h.stopCount);
+        const stopBadge = (!isNaN(stopNum) && stopNum > 0)
+          ? `<span class="text-[10px] font-medium text-slate-400 bg-white/[0.06] border border-white/[0.08] px-1.5 py-0.5 rounded">${stopNum} stop${stopNum === 1 ? '' : 's'}</span>`
+          : "";
+
+        // 2. Mileage Display: ${trip.totalKm || trip.km || 0} KM in text-sm font-semibold text-emerald-400
+        const rawKm = (h.totalKm !== undefined && h.totalKm !== null && h.totalKm !== "") 
+          ? h.totalKm 
+          : (h.km !== undefined && h.km !== null && h.km !== "") 
+            ? h.km 
+            : 0;
+        const kmNumber = Number(rawKm) || 0;
+        const formattedKm = `${kmNumber.toFixed(1)} KM`;
+
+        // 3. Clean Date Formatting
+        const rawDate = h.date || h.tripDate || (h.timestamp ? String(h.timestamp).slice(0, 10) : "");
+        const formattedDate = formatTripDate(rawDate);
 
         return `
           <div class="glass-card p-3.5 space-y-2.5">
@@ -2102,14 +2163,15 @@
               <div class="min-w-0 flex-1">
                 <div class="text-[13px] font-semibold text-white leading-snug flex items-center flex-wrap gap-1.5">
                   ${routeHtml}
+                  ${stopBadge}
                 </div>
               </div>
-              <div class="text-[15px] font-bold text-white shrink-0 tabular-nums">${formattedKm}</div>
+              <div class="text-sm font-semibold text-emerald-400 shrink-0 tabular-nums">${formattedKm}</div>
             </div>
             <div class="text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-white/[0.06]">
               <div class="flex items-center gap-1.5 truncate pr-2">
-                <span class="tabular-nums text-slate-400">${dateStr}</span>
-                ${h.notes ? `<span class="text-slate-600">•</span> <span class="text-slate-300 font-medium truncate">${h.notes}</span>` : ""}
+                <span class="tabular-nums text-slate-300 font-medium">${formattedDate}</span>
+                ${h.notes && h.notes !== routeText ? `<span class="text-slate-600">•</span> <span class="text-slate-400 truncate">${h.notes}</span>` : ""}
               </div>
               <div class="shrink-0 flex items-center gap-1.5">
                 ${h.synced !== false ? '<span class="text-emerald-400 text-[11px] font-medium flex items-center gap-1"><svg class="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Synced</span>' : '<span class="text-amber-400 text-[11px] font-medium">Saved Offline</span>'}
@@ -2287,11 +2349,17 @@
 
     function getTripDateStr(trip) {
       if (!trip) return "";
-      if (trip.date && /^\d{4}-\d{2}-\d{2}/.test(String(trip.date))) {
-        return String(trip.date).slice(0, 10);
+      const raw = trip.date || trip.tripDate || trip.timestamp;
+      if (!raw) return "";
+      if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw.trim())) {
+        return raw.trim().slice(0, 10);
       }
-      if (trip.timestamp && /^\d{4}-\d{2}-\d{2}/.test(String(trip.timestamp))) {
-        return String(trip.timestamp).slice(0, 10);
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
       }
       return "";
     }
@@ -2379,7 +2447,10 @@
       const filteredTrips = Array.isArray(allTrips) ? filterTripsByPeriod(allTrips, currentTaxFilter) : [];
 
       // 1. Business KM Logged
-      const businessKm = (Array.isArray(filteredTrips) ? filteredTrips : []).reduce((sum, t) => sum + (Number(t && t.km) || 0), 0);
+      const businessKm = (Array.isArray(filteredTrips) ? filteredTrips : []).reduce((sum, t) => {
+        const val = Number(t && (t.totalKm !== undefined ? t.totalKm : t.km)) || 0;
+        return sum + val;
+      }, 0);
       const kpiBusinessEl = document.getElementById("kpiBusinessKm");
       const kpiBusinessSubEl = document.getElementById("kpiBusinessSubtext");
       if (kpiBusinessEl) kpiBusinessEl.innerText = `${businessKm.toFixed(1)} km`;
@@ -2423,7 +2494,7 @@
       filteredTrips.forEach(t => {
         if (!t) return;
         const catLabel = classifyTripPurpose(t.notes);
-        const km = Number(t.km) || 0;
+        const km = Number(t && (t.totalKm !== undefined ? t.totalKm : t.km)) || 0;
         purposeTotals[catLabel] = (purposeTotals[catLabel] || 0) + km;
         purposeCounts[catLabel] = (purposeCounts[catLabel] || 0) + 1;
       });
@@ -2479,10 +2550,17 @@
           auditListEl.innerHTML = filteredTrips.map(t => {
             if (!t) return "";
             const dStr = getTripDateStr(t) || "—";
-            const rawRoute = t.stops || t.route || t.notes || "Trip";
+            const rawRoute = (t.route && isNaN(Number(t.route))) 
+              ? t.route 
+              : (t.rawRoute && isNaN(Number(t.rawRoute))) 
+                ? t.rawRoute 
+                : (typeof t.stops === "string" && isNaN(Number(t.stops))) 
+                  ? t.stops 
+                  : (t.notes || "Trip");
             const cleanedRoute = cleanRouteForDisplay(rawRoute);
             const categoryLabel = classifyTripPurpose(t.notes);
-            const kmVal = Number(t.km) > 0 ? `${Number(t.km).toFixed(1)} km` : "0.0 km";
+            const rawKm = (t.totalKm !== undefined && t.totalKm !== null && t.totalKm !== "") ? t.totalKm : ((t.km !== undefined && t.km !== null && t.km !== "") ? t.km : 0);
+            const kmVal = `${(Number(rawKm) || 0).toFixed(1)} km`;
 
             return `
               <div class="py-3 first:pt-1 last:pb-1 flex items-center justify-between gap-3">
