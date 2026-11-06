@@ -1,35 +1,7 @@
-const fs = require('node:fs');
-const vm = require('node:vm');
-const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const { test } = require('node:test');
-const code = fs.readFileSync(require('node:path').join(__dirname, '..', 'GoogleAppsScript_Code.gs'), 'utf8');
-const headers = ['Trip ID', 'Date', 'Notes', 'Route', 'Stops', 'Total KM'];
-const trip = (id = 'TRIP-20261105-ABCD') => ({ id, tripId:id, date:'2026-11-05',
-  stops:['Origin', 'St. Barnabas', 'Origin'], notes:'Site Visit', routeSummary:'St. Barnabas → Home',
-  timestamp:'2026-11-05T18:00:00Z', totalKm:21.4 });
-function server(initial = [], headerRow = headers) {
-  const state = { rows:[headerRow, ...initial], maps:0, locked:false, secret:null, formulas:[] };
-  const sheet = {
-    getDataRange:() => ({getValues:() => state.rows.map(row => [...row])}),
-    appendRow:row => { assert.equal(state.locked,true); state.rows.push(row); },
-    getRange:(row, _, __, width) => ({ getFormulas:() => [state.formulas.length ? state.formulas : new Array(width).fill('')],
-      setValues:values => { assert.equal(state.locked,true); state.rows[row-1] = values[0]; } })
-  };
-  const context = vm.createContext({console,
-    LockService:{getScriptLock:() => ({tryLock:() => {if(state.busy)return false; assert.equal(state.locked,false);state.locked=true;return true;}, releaseLock:() => {state.locked=false;}})},
-    SpreadsheetApp:{getActiveSpreadsheet:() => ({getSheetByName:() => sheet,getUrl:() => 'test-sheet'}),flush:() => assert.equal(state.locked,true)},
-    PropertiesService:{getScriptProperties:() => ({getProperty:() => state.secret})},
-    Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s) => [...crypto.createHash('sha256').update(s).digest()],formatDate:() => '2026-11-05'},
-    Maps:{DirectionFinder:{Mode:{DRIVING:'driving'}},newDirectionFinder:() => {const f={setOrigin:() => f,setDestination:() => f,setMode:() => f,
-      getDirections:() => {state.maps++;return (state.directions || []).shift() || {status:'OK',routes:[{legs:[{distance:{value:12000}}]}]};}};return f;}},
-    ContentService:{MimeType:{JSON:'json'},createTextOutput:s => ({setMimeType:() => JSON.parse(s)})}
-  });
-  vm.runInContext(code,context);
-  state.post = p => context.doPost({postData:{contents:JSON.stringify(p)}});
-  state.get = () => context.doGet();
-  return state;
-}
+const { server, trip, headers } = require('./test-server.cjs');
 
 test('current client mileage and retry: one row, same client ID, no Maps calls',() => {
   const s=server(); const first=s.post(trip()); const retry=s.post(trip());
@@ -91,4 +63,47 @@ test('busy requests return a retryable error without writing',() => {
 test('invalid dates and missing submission identity are rejected',() => {
   const s=server();const p=trip();p.date='2026-02-30';assert.equal(s.post(p).success,false);
   const q=trip();delete q.id;delete q.tripId;delete q.timestamp;assert.equal(s.post(q).success,false);
+});
+
+const entityHeaders = ['Trip ID','Date','Entity','Notes','Route','Stops','Total KM'];
+test('create, retry and GET keep Column C Entity and Column D Notes independent',() => {
+  for (const entity of ['Glen Reyes (Sole Prop)','H4 Community (Unreimbursed)']) {
+    const s=server([],entityHeaders);
+    const p={...trip(),entity,notes:'SHSM Certifications — Workshop Delivery: 3-hr session'};
+    const saved=s.post(p);
+    assert.equal(saved.entity,entity);assert.equal(saved.trip.notes,p.notes);
+    assert.equal(s.rows[1][2],entity);assert.equal(s.rows[1][3],p.notes);
+    assert.equal(s.post(p).duplicate,true);assert.equal(s.rows.length,2);
+    const fetched=s.get();assert.equal(fetched.supportsEntity,true);
+    assert.equal(fetched.trips[0].entity,entity);assert.equal(fetched.trips[0].notes,p.notes);
+  }
+});
+test('edit writes Entity and Notes separately and preserves formula columns',() => {
+  const s=server([['A','2026-11-05','Glen Reyes (Sole Prop)','Old','School',3,20,42]],[...entityHeaders,'Extra']);
+  s.formulas=['','','','','','','','=6*7'];
+  const result=s.post({action:'update',id:'A',entity:'H4 Community (Unreimbursed)',notes:'Cypher Program — Workshop Delivery: Rehearsal'});
+  assert.equal(result.success,true);assert.equal(s.rows[1][2],'H4 Community (Unreimbursed)');
+  assert.equal(s.rows[1][3],'Cypher Program — Workshop Delivery: Rehearsal');assert.equal(s.rows[1][7],'=6*7');
+  assert.equal(result.trip.entity,s.rows[1][2]);
+});
+test('legacy prefixes separate on write only when the Entity column exists',() => {
+  const p={...trip(),notes:'H4 Community (Unreimbursed) — Cypher Program — Workshop Delivery: Rehearsal'};
+  const modern=server([],entityHeaders);modern.post(p);
+  assert.equal(modern.rows[1][2],'H4 Community (Unreimbursed)');assert.equal(modern.rows[1][3],'Cypher Program — Workshop Delivery: Rehearsal');
+  const legacy=server();legacy.post(p);assert.equal(legacy.rows[1][2],p.notes);assert.equal(legacy.get().supportsEntity,false);
+});
+test('missing Entity column and invalid entities reject writes without changing rows',() => {
+  const legacy=server();const p={...trip(),entity:'Glen Reyes (Sole Prop)'};
+  assert.match(legacy.post(p).error,/Entity column/);assert.equal(legacy.rows.length,1);
+  for (const entity of ['Unknown',null,false,{},12]) {
+    const s=server([],entityHeaders);assert.equal(s.post({...p,entity}).success,false);assert.equal(s.rows.length,1);
+  }
+  const s=server([['A','2026-11-05','Glen Reyes (Sole Prop)','Original','School',3,20]],entityHeaders);
+  assert.equal(s.post({action:'update',id:'A',entity:'Invalid',notes:'Changed'}).success,false);
+  assert.equal(s.rows[1][3],'Original');
+});
+test('Entity header mapping survives reordered columns',() => {
+  const s=server([],['Notes','Total KM','Entity','Date','Stops','Route','Trip ID']);
+  const p={...trip(),entity:'Glen Reyes (Sole Prop)'};assert.equal(s.post(p).success,true);
+  assert.equal(s.rows[1][0],p.notes);assert.equal(s.rows[1][2],p.entity);assert.equal(s.get().trips[0].entity,p.entity);
 });

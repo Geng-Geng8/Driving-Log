@@ -1,5 +1,6 @@
 /** Driving Log — bound to your existing Google spreadsheet.
- * Headers: Trip ID | Date | Notes | Route | Stops | Total KM
+ * Headers: Trip ID | Date | Entity | Notes | Route | Stops | Total KM
+ * Insert Entity before Notes; header-based mapping preserves existing columns.
  * Accepts the current app's calculated/manual mileage and older address-only requests.
  */
 const SHEET_NAME = "Trips";
@@ -46,6 +47,7 @@ function doGet() {
       totalKm += trip.totalKm;
     }
     return createJsonResponse({ success: true, status: "success",
+      supportsEntity: context.columns.entity >= 0,
       sheetUrl: context.ss.getUrl(), totalKm: roundKm(totalKm), count: trips.length, trips: trips });
   } catch (error) {
     return errorResponse(error);
@@ -69,6 +71,9 @@ function doPost(e) {
       error: "Server busy. Retry this pending trip shortly.", message: "Server busy. Retry this pending trip shortly." });
 
     const context = readSheet();
+    if (payload.entity !== undefined && context.columns.entity < 0) {
+      throw new Error("Insert an Entity column before Notes (C: Entity, D: Notes). No trip was changed.");
+    }
     let result;
     if (payload.action === "update") result = updateTrip(context, payload);
     else if (!payload.action || payload.action === "create") result = createTrip(context, payload);
@@ -92,6 +97,7 @@ function createTrip(context, payload) {
   }
   const date = validateDate(payload.date || Utilities.formatDate(new Date(), TIME_ZONE, "yyyy-MM-dd"));
   const notes = String(payload.notes || payload.purpose || "Trip");
+  const fields = tripFields(payload.entity, notes);
   const suppliedId = String(payload.id || payload.tripId || "").trim();
   if (suppliedId && !/^[A-Za-z0-9_-]{1,180}$/.test(suppliedId)) throw new Error("Invalid trip ID.");
 
@@ -118,12 +124,13 @@ function createTrip(context, payload) {
   const row = new Array(context.data[0].length).fill("");
   row[c.id] = id;
   row[c.date] = date;
-  row[c.notes] = sheetText(notes);
+  if (c.entity >= 0) row[c.entity] = fields.entity;
+  row[c.notes] = sheetText(c.entity >= 0 ? fields.notes : notes);
   row[c.route] = sheetText(route);
   row[c.stops] = stops.length;
   row[c.km] = km;
   context.sheet.appendRow(row);
-  return successResponse("created", { id: id, tripId: id, date: date, notes: notes,
+  return successResponse("created", { id: id, tripId: id, date: date, entity: c.entity >= 0 ? fields.entity : "", notes: c.entity >= 0 ? fields.notes : notes,
     route: route, rawRoute: route, stops: stops.length, stopsCount: stops.length,
     totalKm: km, km: km, synced: true }, false);
 }
@@ -140,8 +147,13 @@ function updateTrip(context, payload) {
 
   const row = context.data[index].slice();
   const changes = {};
+  if (payload.entity !== undefined || payload.notes !== undefined) {
+    const fields = tripFields(payload.entity !== undefined ? payload.entity : (c.entity >= 0 ? row[c.entity] : ""),
+      payload.notes !== undefined ? payload.notes : row[c.notes]);
+    if (c.entity >= 0) changes[c.entity] = fields.entity;
+    changes[c.notes] = sheetText(c.entity >= 0 ? fields.notes : (payload.notes !== undefined ? payload.notes : row[c.notes]));
+  }
   if (payload.date !== undefined) changes[c.date] = validateDate(payload.date);
-  if (payload.notes !== undefined) changes[c.notes] = sheetText(payload.notes);
   if (payload.route !== undefined) {
     if (!String(payload.route).trim()) throw new Error("Route cannot be empty.");
     changes[c.route] = sheetText(cleanRouteString(payload.route));
@@ -190,12 +202,13 @@ function readSheet() {
   const columns = {
     id: headers.findIndex(h => h === "trip id" || h === "id"),
     date: headers.findIndex(h => h === "date" || h === "trip date"),
+    entity: headers.findIndex(h => h === "entity" || h === "tax entity"),
     notes: headers.findIndex(h => h === "notes" || h === "purpose" || h === "note"),
     route: headers.findIndex(h => h === "route" || h === "route summary"),
     stops: headers.findIndex(h => h === "stops" || h === "stop count" || h === "stops count"),
     km: headers.findIndex(h => h === "total km" || h === "km" || h === "distance km")
   };
-  if (Object.keys(columns).some(key => columns[key] < 0)) {
+  if (Object.keys(columns).some(key => key !== "entity" && columns[key] < 0)) {
     throw new Error("Row 1 must contain: Trip ID, Date, Notes, Route, Stops, Total KM.");
   }
   return { ss: ss, sheet: sheet, data: data, columns: columns };
@@ -208,7 +221,7 @@ function tripFromRow(row, c, fallbackId) {
   const km = Number(row[c.km]);
   const totalKm = Number.isFinite(km) ? roundKm(km) : 0;
   const stops = Number(row[c.stops]) || 0;
-  return { id: id, tripId: id, date: date, notes: String(row[c.notes] || ""),
+  return { id: id, tripId: id, date: date, entity: c.entity >= 0 ? String(row[c.entity] || "") : "", notes: String(row[c.notes] || ""),
     route: cleanRouteString(row[c.route]), rawRoute: String(row[c.route] || ""),
     stops: stops, stopsCount: stops, stopCount: stops, totalKm: totalKm, km: totalKm, synced: true };
 }
@@ -216,7 +229,17 @@ function tripFromRow(row, c, fallbackId) {
 function successResponse(action, trip, duplicate) {
   return { success: true, status: "success", action: action, duplicate: duplicate,
     id: trip.id, tripId: trip.tripId, totalKm: trip.totalKm, km: trip.totalKm,
-    date: trip.date, route: trip.route, stops: trip.stops, notes: trip.notes, trip: trip };
+    date: trip.date, route: trip.route, stops: trip.stops, entity: trip.entity, notes: trip.notes, trip: trip };
+}
+
+function tripFields(entity, notes) {
+  const entities = ["Glen Reyes (Sole Prop)", "H4 Community (Unreimbursed)"];
+  if (entity !== undefined && typeof entity !== "string") throw new Error("Invalid tax entity. No trip was changed.");
+  const text = String(notes || "");
+  const legacy = entities.find(label => text.startsWith(label + " — "));
+  const explicit = String(entity || "").trim();
+  if (explicit && entities.indexOf(explicit) < 0) throw new Error("Invalid tax entity. No trip was changed.");
+  return { entity: explicit || legacy || "", notes: legacy ? text.slice(legacy.length + 3) : text };
 }
 
 function validateKm(value) {

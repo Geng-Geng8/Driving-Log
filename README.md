@@ -8,7 +8,13 @@ Open your spreadsheet's **Extensions > Apps Script** and replace `Code.gs` with
 web app deployment to a **New version** using **Deploy > Manage deployments > Edit**.
 Keep its existing access settings and URL. A GitHub update does not deploy Apps Script.
 
-The sheet must have these headers: `Trip ID`, `Date`, `Notes`, `Route`, `Stops`, `Total KM`.
+The sheet must have these headers: `Trip ID`, `Date`, `Entity`, `Notes`, `Route`, `Stops`, `Total KM`.
+For an existing sheet, **insert a new Column C** named `Entity`; the existing Notes
+column moves to D. Do not rename or overwrite existing Notes cells. Other columns
+are mapped by header, including when reordered. Old rows need no bulk rewrite.
+The new app checks backend support before sending separated Entity/Notes writes;
+until the new Code.gs is deployed and the Entity header exists, new trips stay pending.
+Read-only history continues to work with the previous backend and old schema.
 The backend accepts calculated/manual mileage, validates edits, and acknowledges retries
 of the same submission without adding another row. Existing duplicates are not deleted.
 
@@ -24,15 +30,19 @@ After deploying Apps Script, verify one trip save, a Pending retry, and one edit
 
 ## Trip categories and audit notes
 
-Choose one tax entity, program, and activity. The live preview is the exact Notes
-value saved to Column C: `Entity — Program — Activity: Detail`. Empty details use
+Choose one tax entity, program, and activity. Entity is a separate top-level payload
+field saved to Column C. Notes in Column D are `Program — Activity: Detail`.
+The live preview shows `Entity: [Entity] | Notes: [Notes]`. Empty details use
 the selected activity's description. Category selections persist across trips and
 reloads; specific details clear after a completed or queued submission.
 
 The edit modal keeps direct Notes editing and offers category controls for structured
-notes. Legacy notes stay unchanged until edited. Entity reports use the active date
-filter and show unclassified legacy notes separately; structured entity tags take
-precedence over names mentioned in the detail to avoid counting a trip twice.
+notes, with a dedicated Entity toggle always visible at the top. Legacy prefixes
+are removed in the edit field; saving writes Entity and clean Notes independently.
+Unassigned legacy trips require an explicit entity selection before editing is saved.
+Entity reports use the active date filter and group by the dedicated field first,
+falling back to old note prefixes or unambiguous legacy names when it is blank.
+Entity names inside a structured detail never override the selected entity.
 
 The portfolio contains SHSM Certifications, Dance Workshops, Leadership Workshops,
 Presentations & Keynotes, Cypher Program, Competitive Arts / BotB, B Thee Rise,

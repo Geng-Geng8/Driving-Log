@@ -349,17 +349,17 @@ test('service worker never falls back to a cached Apps Script response',async ()
 
 test('default audit string, live preview and persisted single-select preferences agree',() => {
   const c=browser();c.initializeTripCategorization();
-  const expected='Glen Reyes (Sole Prop) — SHSM Certifications — Workshop Delivery: Direct student instruction / workshop delivery';
+  const expected='SHSM Certifications — Workshop Delivery: Direct student instruction / workshop delivery';
   assert.equal(c.getTripAuditNotes(),expected);
-  assert.equal(c.document.getElementById('craNotesPreview').textContent,expected);
+  assert.equal(c.document.getElementById('craNotesPreview').textContent,'Entity: Glen Reyes (Sole Prop) | Notes: '+expected);
   c.selectTripCategory('trip','entity','h4');
   c.selectTripCategory('trip','program','b-thee-rise');
   c.selectTripCategory('trip','activity','gear');
   c.document.getElementById('tripNoteInput').value='Sound pickup';c.updateCraNotesPreview();
-  assert.equal(c.getTripAuditNotes(),'H4 Community (Unreimbursed) — B Thee Rise — Gear & Equipment Run: Sound pickup');
-  assert.equal(c.document.getElementById('craNotesPreview').textContent,c.getTripAuditNotes());
+  assert.equal(c.getTripAuditNotes(),'B Thee Rise — Gear & Equipment Run: Sound pickup');
+  assert.equal(c.document.getElementById('craNotesPreview').textContent,'Entity: H4 Community (Unreimbursed) | Notes: '+c.getTripAuditNotes());
   c.initializeTripCategorization();
-  assert.equal(c.getTripAuditNotes(),'H4 Community (Unreimbursed) — B Thee Rise — Gear & Equipment Run: Sound pickup');
+  assert.equal(c.getTripAuditNotes(),'B Thee Rise — Gear & Equipment Run: Sound pickup');
 });
 
 test('all seven activities use their exact default descriptions and user details replace them',() => {
@@ -380,7 +380,8 @@ test('recording a trip sends the exact structured notes into the save pipeline',
   c.document.getElementById('tripNoteInput').value='Snacks and prizes';
   c.calculateRouteKm=async () => 18;c.saveTripToSheet=async p => {saved=p;};
   await c.recordCircuit();
-  assert.equal(saved.notes,'H4 Community (Unreimbursed) — Filipino Projects — Supplies & Hospitality: Snacks and prizes');
+  assert.equal(saved.notes,'Filipino Projects — Supplies & Hospitality: Snacks and prizes');
+  assert.equal(saved.entity,'H4 Community (Unreimbursed)');
 });
 
 test('trip reset clears only specific details and retains selected categories',() => {
@@ -397,10 +398,10 @@ test('edit modal parses structured notes, updates chips without changing raw tex
   c.localStorage.setItem('cached_trips_data',JSON.stringify([{...trip('A'),notes,route:'School → Home'}]));
   c.document.body={classList:{add() {},remove() {}}};
   c.openEditTripModal('A');
-  assert.equal(c.document.getElementById('editTripNotes').value,notes);
+  assert.equal(c.document.getElementById('editTripNotes').value,'Cypher Program — Workshop Delivery: Grade 11 class');
   assert.equal(vm.runInContext('editTripCategories.entity',c),'h4');
   c.selectTripCategory('edit','activity','logistics');
-  assert.equal(c.document.getElementById('editTripNotes').value,'H4 Community (Unreimbursed) — Cypher Program — Artist / Youth Logistics: Grade 11 class');
+  assert.equal(c.document.getElementById('editTripNotes').value,'Cypher Program — Artist / Youth Logistics: Grade 11 class');
   assert.equal(vm.runInContext('tripCategories.entity',c),'sole-prop');
 });
 
@@ -413,12 +414,14 @@ test('changing an edit activity replaces its old default but preserves legacy cu
   assert.equal(vm.runInContext('editTripCategories',c),null);
   assert.equal(input.value,'Original custom note: visit with planner');
   c.selectTripCategory('edit','entity','h4');
+  assert.equal(input.value,'Original custom note: visit with planner');
+  c.selectTripCategory('edit','activity','gear');
   assert.ok(input.value.endsWith(': Original custom note: visit with planner'));
 });
 
 test('entity totals keep legacy notes unclassified and avoid detail-based double counting',() => {
   const c=browser();const notes=c.buildAuditNotes({entity:'sole-prop',program:'shsm',activity:'workshop'},'Meeting with H4 Community');
-  const rows=c.calculateEntityBreakdown([{notes,totalKm:30},{notes:'Trip for H4 Community',km:20},{notes:'Glen Reyes errand',totalKm:10},{notes:'School visit',km:40}]);
+  const rows=c.calculateEntityBreakdown([{entity:'Glen Reyes (Sole Prop)',notes,totalKm:30},{notes:'Trip for H4 Community',km:20},{notes:'Glen Reyes errand',totalKm:10},{notes:'School visit',km:40}]);
   assert.equal(rows.find(r=>r.id==='sole-prop').km,40);
   assert.equal(rows.find(r=>r.id==='h4').percent,20);
   assert.equal(rows.find(r=>r.id==='unclassified').km,40);
@@ -459,12 +462,12 @@ test('portfolio programs match the twelve requested labels and round-trip for ei
   ]);
   for(const entity of ['sole-prop','h4'])for(const program of programs){
     const notes=c.buildAuditNotes({entity,program:program.id,activity:'event'},'Planning: venue — follow-up');
-    const parsed=c.parseAuditNotes(notes);
+    const parsed=c.parseAuditNotes(notes,c.entityLabel(entity));
     assert.equal(parsed.entity,entity);assert.equal(parsed.program,program.id);
     assert.equal(parsed.detail,'Planning: venue — follow-up');
     assert.equal(c.classifyTripPurpose(notes),program.label);
     c.document.body={classList:{add() {},remove() {}}};
-    c.localStorage.setItem('cached_trips_data',JSON.stringify([{...trip('portfolio'),stops:3,notes,route:'Venue → Home'}]));
+    c.localStorage.setItem('cached_trips_data',JSON.stringify([{...trip('portfolio'),entity:c.entityLabel(entity),stops:3,notes,route:'Venue → Home'}]));
     c.openEditTripModal('portfolio');
     assert.equal(vm.runInContext('editTripCategories.program',c),program.id);
     assert.equal(c.document.getElementById('editTripNotes').value,notes);
@@ -518,7 +521,7 @@ test('edit entity switching updates Notes with the new program default and prese
 test('every program tallies within its own entity without cross-counting detail mentions',() => {
   const c=browser();const programs=vm.runInContext('TRIP_PROGRAMS',c);const trips=[];
   for(const entity of ['sole-prop','h4'])for(const program of programs){
-    trips.push({notes:c.buildAuditNotes({entity,program:program.id,activity:'event'},'H4 Community / Glen Reyes / Cypher Program'),totalKm:entity==='h4'?20:10});
+    trips.push({entity:c.entityLabel(entity),notes:c.buildAuditNotes({entity,program:program.id,activity:'event'},'H4 Community / Glen Reyes / Cypher Program'),totalKm:entity==='h4'?20:10});
   }
   const rows=c.calculateEntityBreakdown(trips);
   const sole=rows.find(r=>r.id==='sole-prop');const h4=rows.find(r=>r.id==='h4');
@@ -530,4 +533,116 @@ test('every program tallies within its own entity without cross-counting detail 
   const markup=c.document.getElementById('entityBreakdownList').innerHTML;
   assert.match(markup,/Programs for Glen Reyes/);assert.match(markup,/Programs for H4 Community/);
   assert.equal((markup.match(/Breaking Canada Events/g)||[]).length,2);
+});
+
+test('create and edit payloads write Column C Entity and Column D clean Notes through the real backend',async () => {
+  const {server}=require('./test-server.cjs');
+  const s=server([],['Trip ID','Date','Entity','Notes','Route','Stops','Total KM']);
+  const sent=[];
+  const c=browser(async (_,options) => {
+    if (options.method==='GET') return reply(s.get());
+    const payload=JSON.parse(options.body);sent.push(payload);return reply(s.post(payload));
+  });
+  prepareRecord(c);c.calculateRouteKm=async()=>21.4;
+  c.document.getElementById('tripNoteInput').value='3-hr session';
+  await c.recordCircuit();
+  assert.equal(sent[0].entity,'Glen Reyes (Sole Prop)');
+  assert.equal(sent[0].notes,'SHSM Certifications — Workshop Delivery: 3-hr session');
+  assert.equal(s.rows[1][2],sent[0].entity);assert.equal(s.rows[1][3],sent[0].notes);
+  assert.equal(c.pending().length,0);assert.equal(c.history[0].entity,sent[0].entity);
+  await c.realSync();
+  c.document.body={classList:{add(){},remove(){}}};
+  c.openEditTripModal(sent[0].id);
+  assert.equal(vm.runInContext('editTripEntity',c),'sole-prop');
+  assert.equal(c.document.getElementById('editTripNotes').value,sent[0].notes);
+  c.selectTripCategory('edit','entity','h4');
+  const input=c.document.getElementById('editTripNotes');
+  input.value='Cypher Program — Workshop Delivery: Rehearsal';c.syncEditCategoryFromNotes();
+  await c.saveEditedTrip();
+  assert.equal(sent[1].action,'update');assert.equal(sent[1].entity,'H4 Community (Unreimbursed)');
+  assert.equal(s.rows[1][2],sent[1].entity);assert.equal(s.rows[1][3],input.value);
+  assert.equal(s.rows.length,2);assert.equal(c.alerts.at(-1).type,'success');
+  await c.realSync();
+  const refreshed=JSON.parse(c.localStorage.getItem('cached_trips_data'))[0];
+  assert.equal(refreshed.entity,sent[1].entity);assert.equal(refreshed.notes,input.value);
+});
+
+test('entity field wins over conflicting legacy notes and structured details never assign an entity',() => {
+  const c=browser();
+  const notes='H4 Community (Unreimbursed) — Cypher Program — Workshop Delivery: Glen Reyes class';
+  const explicit={...trip('A'),entity:'Glen Reyes (Sole Prop)',notes,totalKm:30};
+  assert.equal(c.resolveTripEntity(explicit),'sole-prop');
+  assert.equal(c.resolveTripEntity({notes}),'h4');
+  assert.equal(c.resolveTripEntity({notes:'Cypher Program — Workshop Delivery: H4 Community'}),'unclassified');
+  assert.equal(c.resolveTripEntity({entity:'Unknown',notes}),'unclassified');
+  const rows=c.calculateEntityBreakdown([explicit,{notes,km:10}]);
+  assert.equal(rows[0].km,30);assert.equal(rows[1].km,10);
+  c.realRender([explicit,{...trip('B'),notes:'Unknown purpose'}]);
+  const markup=c.document.getElementById('recentDrivesFeed').innerHTML;
+  assert.match(markup,/Sole Prop/);assert.match(markup,/Unassigned/);
+  assert.doesNotMatch(markup,/H4 Community \(Unreimbursed\) —/);
+  assert.match(c.renderEntityBadge({notes}),/text-blue-300/);
+  c.document.body={classList:{add(){},remove(){}}};
+  c.localStorage.setItem('cached_trips_data',JSON.stringify([explicit]));c.openEditTripModal('A');
+  assert.equal(vm.runInContext('editTripEntity',c),'sole-prop');
+  assert.equal(c.document.getElementById('editTripNotes').value,'Cypher Program — Workshop Delivery: Glen Reyes class');
+});
+
+test('an outdated backend cannot silently drop entity: queue stays intact until upgrade',async () => {
+  let ready=false;const posted=[];
+  const c=browser(async (_,options) => {
+    if(options.method==='GET')return reply({success:true,trips:[],supportsEntity:ready});
+    const payload=JSON.parse(options.body);posted.push(payload);
+    return reply({success:true,trip:{...payload,totalKm:21.4}});
+  });
+  const p={...trip('new'),entity:'Glen Reyes (Sole Prop)',notes:'SHSM Certifications — Workshop Delivery: Session'};
+  await c.saveTripToSheet(p);
+  assert.equal(posted.length,0);assert.equal(c.pending().length,1);
+  assert.match(c.alerts.at(-1).message,/redeploy Code.gs/);
+  const id=c.pending()[0].id;
+  c.reconcilePendingTrips([{id,notes:p.notes}]);assert.equal(c.pending().length,1);
+  ready=true;await c.processPendingQueue();
+  assert.equal(posted.length,1);assert.equal(posted[0].id,id);assert.equal(posted[0].entity,p.entity);
+  assert.equal(c.pending().length,0);
+});
+
+test('missing entity acknowledgement retains pending submission and cannot reconcile against another entity',async () => {
+  const c=browser(async (_,options)=> options.method==='GET' ? reply({success:true,supportsEntity:true}) : reply());
+  await c.saveTripToSheet({...trip('A'),entity:'Glen Reyes (Sole Prop)'});
+  assert.equal(c.pending().length,1);const p=c.pending()[0];
+  await c.processPendingQueue();assert.equal(c.pending().length,1);
+  c.reconcilePendingTrips([{...p,entity:'H4 Community (Unreimbursed)'}]);assert.equal(c.pending().length,1);
+  c.reconcilePendingTrips([p]);assert.equal(c.pending().length,0);
+});
+
+test('legacy edits require an explicit entity and preserve custom Notes when switching entity',async () => {
+  let posts=0;
+  const c=browser(async(_,options)=>{if(options.method==='POST')posts++;return reply({success:true,trips:[]});});
+  c.document.body={classList:{add(){},remove(){}}};
+  const original={...trip('A'),stops:3,notes:'Original custom note',route:'School → Home'};
+  c.localStorage.setItem('cached_trips_data',JSON.stringify([original]));c.openEditTripModal('A');
+  assert.equal(vm.runInContext('editTripEntity',c),'');await c.saveEditedTrip();
+  assert.equal(posts,0);assert.match(c.alerts.at(-1).message,/Choose a Tax Entity/);
+  c.selectTripCategory('edit','entity','h4');
+  assert.equal(c.document.getElementById('editTripNotes').value,'Original custom note');
+  c.document.getElementById('editTripNotes').value='Custom changed';c.syncEditCategoryFromNotes();
+  assert.equal(vm.runInContext('editTripEntity',c),'h4');
+  await c.saveEditedTrip();assert.equal(posts,0);
+  assert.equal(JSON.parse(c.localStorage.getItem('cached_trips_data'))[0].notes,original.notes);
+  assert.match(c.alerts.at(-1).message,/redeploy Code.gs/);
+});
+
+test('a lost create response retries the same separated payload without duplicating the sheet row',async () => {
+  const {server}=require('./test-server.cjs');
+  const s=server([],['Trip ID','Date','Entity','Notes','Route','Stops','Total KM']);let lost=true;const sent=[];
+  const c=browser(async(_,options)=>{
+    if(options.method==='GET')return reply(s.get());
+    const p=JSON.parse(options.body);sent.push(p);const result=s.post(p);
+    if(lost){lost=false;throw new Error('Response lost');}return reply(result);
+  });
+  const p={...trip('A'),entity:'H4 Community (Unreimbursed)',notes:'Cypher Program — Workshop Delivery: Rehearsal'};
+  await c.saveTripToSheet(p);assert.equal(c.pending().length,1);
+  await c.processPendingQueue();
+  assert.equal(c.pending().length,0);assert.equal(s.rows.length,2);
+  assert.equal(sent[0].id,sent[1].id);assert.equal(s.rows[1][2],p.entity);assert.equal(s.rows[1][3],p.notes);
 });
