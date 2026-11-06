@@ -1,4 +1,4 @@
-const CACHE_NAME = 'driving-log-v7';
+const CACHE_NAME = 'driving-log-v8';
 const ASSETS = [
   './',
   './index.html',

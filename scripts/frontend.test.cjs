@@ -349,7 +349,7 @@ test('service worker never falls back to a cached Apps Script response',async ()
 
 test('default audit string, live preview and persisted single-select preferences agree',() => {
   const c=browser();c.initializeTripCategorization();
-  const expected='Glen Reyes (Sole Prop) — SHSM — Workshop Delivery: Direct student instruction / workshop delivery';
+  const expected='Glen Reyes (Sole Prop) — SHSM Certifications — Workshop Delivery: Direct student instruction / workshop delivery';
   assert.equal(c.getTripAuditNotes(),expected);
   assert.equal(c.document.getElementById('craNotesPreview').textContent,expected);
   c.selectTripCategory('trip','entity','h4');
@@ -428,7 +428,7 @@ test('entity totals keep legacy notes unclassified and avoid detail-based double
 
 test('entity report respects period filters and program reports use the selected program, not its detail',() => {
   const c=browser();const notes=c.buildAuditNotes({entity:'sole-prop',program:'shsm',activity:'pitch'},'Discuss Cypher Program');
-  assert.equal(c.classifyTripPurpose(notes),'SHSM');
+  assert.equal(c.classifyTripPurpose(notes),'SHSM Certifications');
   c.localStorage.setItem('driving_log_recent_trips',JSON.stringify([
     {notes,totalKm:30,date:'2026-11-05'},
     {notes:'H4 Community errand',totalKm:70,date:'2025-11-05'}
@@ -447,4 +447,87 @@ test('vendor hubs are searchable dataset entries and survive generator deduplica
     assert.equal(locations.filter(item=>item.name===name&&item.address===address&&item.board==='GTA').length,1);
     assert.equal(refreshed.filter(item=>item.name===name&&item.address===address&&item.board==='GTA').length,1);
   }
+});
+
+test('portfolio programs match the twelve requested labels and round-trip for either entity',() => {
+  const c=browser();
+  const programs=vm.runInContext('TRIP_PROGRAMS',c);
+  assert.deepEqual(Array.from(programs,p=>p.label),[
+    'SHSM Certifications','Dance Workshops','Leadership Workshops','Presentations & Keynotes',
+    'Cypher Program','Competitive Arts / BotB','B Thee Rise','Filipino Projects',
+    'Breaking Canada Events','Community & Misc Events','Sales & Outreach','Admin & Governance'
+  ]);
+  for(const entity of ['sole-prop','h4'])for(const program of programs){
+    const notes=c.buildAuditNotes({entity,program:program.id,activity:'event'},'Planning: venue — follow-up');
+    const parsed=c.parseAuditNotes(notes);
+    assert.equal(parsed.entity,entity);assert.equal(parsed.program,program.id);
+    assert.equal(parsed.detail,'Planning: venue — follow-up');
+    assert.equal(c.classifyTripPurpose(notes),program.label);
+    c.document.body={classList:{add() {},remove() {}}};
+    c.localStorage.setItem('cached_trips_data',JSON.stringify([{...trip('portfolio'),stops:3,notes,route:'Venue → Home'}]));
+    c.openEditTripModal('portfolio');
+    assert.equal(vm.runInContext('editTripCategories.program',c),program.id);
+    assert.equal(c.document.getElementById('editTripNotes').value,notes);
+  }
+});
+
+test('entity switching applies smart defaults while preserving Sole Prop contract services',() => {
+  const c=browser();
+  c.selectTripCategory('trip','entity','h4');
+  assert.equal(vm.runInContext('tripCategories.program',c),'cypher');
+  c.selectTripCategory('trip','program','breaking');
+  c.selectTripCategory('trip','entity','sole-prop');
+  assert.equal(vm.runInContext('tripCategories.program',c),'shsm');
+  for(const contract of ['shsm','dance','leadership','keynotes']){
+    c.selectTripCategory('trip','entity','h4');
+    c.selectTripCategory('trip','program',contract);
+    c.selectTripCategory('trip','entity','sole-prop');
+    assert.equal(vm.runInContext('tripCategories.program',c),contract);
+    c.selectTripCategory('trip','entity','h4');
+    assert.equal(vm.runInContext('tripCategories.program',c),'cypher');
+  }
+  c.selectTripCategory('trip','program','community');
+  c.selectTripCategory('trip','entity','h4'); // Not an entity toggle; preserve the explicit choice.
+  assert.equal(vm.runInContext('tripCategories.program',c),'community');
+  c.initializeTripCategorization();
+  assert.equal(vm.runInContext('tripCategories.program',c),'community');
+});
+
+test('missing H4 preferences default to Cypher and old labels still parse without rewriting notes',() => {
+  const c=browser();
+  c.localStorage.setItem('driving_log_category_preferences',JSON.stringify({entity:'h4',program:'removed-program'}));
+  c.initializeTripCategorization();assert.equal(vm.runInContext('tripCategories.program',c),'cypher');
+  for(const [label,id] of [['SHSM','shsm'],['SHSM Workshop','shsm'],['Admin / Governance','admin']]){
+    const notes=`Glen Reyes (Sole Prop) — ${label} — Workshop Delivery: Original detail`;
+    c.document.getElementById('editTripNotes').value=notes;c.syncEditCategoryFromNotes();
+    assert.equal(vm.runInContext('editTripCategories.program',c),id);
+    assert.equal(c.document.getElementById('editTripNotes').value,notes);
+  }
+});
+
+test('edit entity switching updates Notes with the new program default and preserves details',() => {
+  const c=browser();const input=c.document.getElementById('editTripNotes');
+  input.value=c.buildAuditNotes({entity:'sole-prop',program:'keynotes',activity:'event'},'School assembly');
+  c.syncEditCategoryFromNotes();c.selectTripCategory('edit','entity','h4');
+  assert.equal(c.parseAuditNotes(input.value).program,'cypher');
+  assert.equal(c.parseAuditNotes(input.value).detail,'School assembly');
+  c.selectTripCategory('edit','program','dance');c.selectTripCategory('edit','entity','sole-prop');
+  assert.equal(c.parseAuditNotes(input.value).program,'dance');
+});
+
+test('every program tallies within its own entity without cross-counting detail mentions',() => {
+  const c=browser();const programs=vm.runInContext('TRIP_PROGRAMS',c);const trips=[];
+  for(const entity of ['sole-prop','h4'])for(const program of programs){
+    trips.push({notes:c.buildAuditNotes({entity,program:program.id,activity:'event'},'H4 Community / Glen Reyes / Cypher Program'),totalKm:entity==='h4'?20:10});
+  }
+  const rows=c.calculateEntityBreakdown(trips);
+  const sole=rows.find(r=>r.id==='sole-prop');const h4=rows.find(r=>r.id==='h4');
+  assert.equal(sole.km,120);assert.equal(h4.km,240);
+  assert.ok(sole.programs.filter(p=>p.id!=='other').every(p=>p.km===10&&p.count===1));
+  assert.ok(h4.programs.filter(p=>p.id!=='other').every(p=>p.km===20&&p.count===1));
+  assert.equal(rows.find(r=>r.id==='unclassified').count,0);
+  c.renderEntityBreakdown(trips);
+  const markup=c.document.getElementById('entityBreakdownList').innerHTML;
+  assert.match(markup,/Programs for Glen Reyes/);assert.match(markup,/Programs for H4 Community/);
+  assert.equal((markup.match(/Breaking Canada Events/g)||[]).length,2);
 });

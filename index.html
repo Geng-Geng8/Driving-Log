@@ -107,7 +107,12 @@
     .category-radio input:checked + span { background: rgb(16 185 129 / .2); color: #6ee7b7; border-color: #10b981; }
     .category-radio.entity-h4 input:checked + span { background: rgb(245 158 11 / .16); color: #fcd34d; border-color: #f59e0b; }
     .category-radio input:focus-visible + span { outline: 2px solid #e2e8f0; outline-offset: 3px; }
-    .category-carousel { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; }
+    .category-carousel { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: smooth; padding: 4px 2px 6px; }
+    .category-carousel .category-radio { min-height: 44px; display: flex; align-items: center; }
+    .category-carousel .category-radio span { min-height: 32px; height: auto; padding: 6px 12px; border-radius: 8px; white-space: nowrap; background: rgb(30 41 59 / .8); font-weight: 500; transition: background-color .15s, border-color .15s, color .15s; }
+    .category-carousel .category-radio:hover span { background: rgb(51 65 85 / .8); }
+    .category-carousel .category-radio input:checked + span { background: rgb(16 185 129 / .2); color: #6ee7b7; border-color: #10b981; font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+    @media (prefers-reduced-motion: reduce) { .category-carousel { scroll-behavior: auto; } .category-carousel .category-radio span { transition: none; } }
     .category-activities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .category-activities .category-radio span { justify-content: flex-start; }
 
@@ -680,7 +685,7 @@
       </fieldset>
       <fieldset class="space-y-2 min-w-0">
         <legend class="micro-label">2 · Program</legend>
-        <div id="tripProgramOptions" class="category-carousel"></div>
+        <div id="tripProgramOptions" class="category-carousel flex flex-nowrap overflow-x-auto gap-2 pb-1.5 no-scrollbar overscroll-x-contain"></div>
       </fieldset>
       <fieldset class="space-y-2">
         <legend class="micro-label">3 · Activity</legend>
@@ -1014,7 +1019,7 @@
           <p id="editCategoryHint" class="text-xs text-slate-400 mb-3"></p>
           <div class="space-y-3">
             <fieldset><legend class="micro-label mb-2">Tax Entity</legend><div id="editEntityOptions" class="grid grid-cols-2 gap-2"></div></fieldset>
-            <fieldset class="min-w-0"><legend class="micro-label mb-2">Program</legend><div id="editProgramOptions" class="category-carousel"></div></fieldset>
+            <fieldset class="min-w-0"><legend class="micro-label mb-2">Program</legend><div id="editProgramOptions" class="category-carousel flex flex-nowrap overflow-x-auto gap-2 pb-1.5 no-scrollbar overscroll-x-contain"></div></fieldset>
             <fieldset><legend class="micro-label mb-2">Activity</legend><div id="editActivityOptions" class="category-activities"></div></fieldset>
           </div>
         </details>
@@ -1849,13 +1854,18 @@
       { id: "h4", label: "H4 Community (Unreimbursed)", reportLabel: "H4 Community (Unreimbursed NPO)" }
     ];
     const TRIP_PROGRAMS = [
-      { id: "shsm", label: "SHSM" },
+      { id: "shsm", label: "SHSM Certifications", contractService: true, aliases: ["SHSM", "SHSM Workshop"] },
+      { id: "dance", label: "Dance Workshops", contractService: true },
+      { id: "leadership", label: "Leadership Workshops", contractService: true },
+      { id: "keynotes", label: "Presentations & Keynotes", contractService: true },
       { id: "cypher", label: "Cypher Program" },
-      { id: "b-thee-rise", label: "B Thee Rise" },
       { id: "competitive", label: "Competitive Arts / BotB" },
+      { id: "b-thee-rise", label: "B Thee Rise" },
       { id: "filipino", label: "Filipino Projects" },
+      { id: "breaking", label: "Breaking Canada Events" },
+      { id: "community", label: "Community & Misc Events" },
       { id: "sales", label: "Sales & Outreach" },
-      { id: "admin", label: "Admin / Governance" }
+      { id: "admin", label: "Admin & Governance", aliases: ["Admin / Governance"] }
     ];
     const TRIP_ACTIVITIES = [
       { id: "workshop", label: "Workshop Delivery", description: "Direct student instruction / workshop delivery" },
@@ -1870,11 +1880,25 @@
     let tripCategories = { entity: "sole-prop", program: "shsm", activity: "workshop" };
     let editTripCategories = null;
 
+    function defaultProgramForEntity(entity) {
+      return entity === "h4" ? "cypher" : "shsm";
+    }
+
+    function updateCategorySelection(selection, tier, value) {
+      const previousEntity = selection.entity;
+      selection[tier] = value;
+      if (tier === "entity" && value !== previousEntity) {
+        const program = TRIP_PROGRAMS.find(option => option.id === selection.program);
+        if (value === "h4" || !program || !program.contractService) selection.program = defaultProgramForEntity(value);
+      }
+    }
+
     function normalizeCategories(candidate = {}) {
       candidate = candidate || {};
       const selection = {};
       Object.entries(CATEGORY_OPTIONS).forEach(([tier, options]) => {
-        selection[tier] = options.some(option => option.id === candidate[tier]) ? candidate[tier] : options[0].id;
+        const fallback = tier === "program" ? defaultProgramForEntity(selection.entity) : options[0].id;
+        selection[tier] = options.some(option => option.id === candidate[tier]) ? candidate[tier] : fallback;
       });
       return selection;
     }
@@ -1892,7 +1916,9 @@
       if (!match) return null;
       const selection = {};
       for (const [index, tier] of ["entity", "program", "activity"].entries()) {
-        const option = CATEGORY_OPTIONS[tier].find(option => option.label === match[index + 1].trim());
+        const label = match[index + 1].trim().toLowerCase();
+        const option = CATEGORY_OPTIONS[tier].find(option => option.label.toLowerCase() === label ||
+          (option.aliases || []).some(alias => alias.toLowerCase() === label));
         if (!option) return null;
         selection[tier] = option.id;
       }
@@ -1909,7 +1935,7 @@
         if (!container) return;
         container.innerHTML = options.map(option => `<label class="category-radio${tier === "entity" && option.id === "h4" ? " entity-h4" : ""}">
           <input type="radio" name="${scope}-${tier}" value="${option.id}" onchange="selectTripCategory('${scope}', '${tier}', this.value)">
-          <span>${escapeCategoryHtml(option.label)}</span></label>`).join("");
+          <span${tier === "program" ? ' class="px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-all bg-slate-800/80 text-slate-300 border border-slate-700 hover:bg-slate-700/80"' : ""}>${escapeCategoryHtml(option.label)}</span></label>`).join("");
       });
       syncCategoryControls(scope);
     }
@@ -1938,7 +1964,7 @@
     function selectTripCategory(scope, tier, value) {
       if (!CATEGORY_OPTIONS[tier] || !CATEGORY_OPTIONS[tier].some(option => option.id === value)) return;
       if (scope === "trip") {
-        tripCategories[tier] = value;
+        updateCategorySelection(tripCategories, tier, value);
         try { localStorage.setItem("driving_log_category_preferences", JSON.stringify(tripCategories)); } catch (error) { /* Selection still works for this session. */ }
         syncCategoryControls("trip");
         updateCraNotesPreview();
@@ -1946,7 +1972,7 @@
         if (!editTripCategories) editTripCategories = { ...normalizeCategories(), detail: document.getElementById("editTripNotes").value.trim() };
         const previous = TRIP_ACTIVITIES.find(option => option.id === editTripCategories.activity);
         if (tier === "activity" && editTripCategories.detail === previous.description) editTripCategories.detail = "";
-        editTripCategories[tier] = value;
+        updateCategorySelection(editTripCategories, tier, value);
         document.getElementById("editTripNotes").value = buildAuditNotes(editTripCategories, editTripCategories.detail);
         syncEditCategoryFromNotes();
       }
@@ -3105,7 +3131,7 @@
     // TAX & REPORTS DASHBOARD (PURE CLIENT-SIDE AGGREGATION)
     // -------------------------------------------------------------
     const PURPOSE_CATEGORIES = [
-      ...TRIP_PROGRAMS.map(option => ({ ...option, match: [option.label.toLowerCase()] })),
+      ...TRIP_PROGRAMS.map(option => ({ ...option, match: [option.label, ...(option.aliases || [])].map(label => label.toLowerCase()) })),
       { id: "board", label: "# Board Meeting", match: ["board meeting", "board"] },
       { id: "site", label: "# Site Visit", match: ["site visit"] },
       { id: "other", label: "Other", match: [] }
@@ -3350,6 +3376,10 @@
     function calculateEntityBreakdown(trips) {
       const rows = [...TAX_ENTITIES.map(entity => ({ id: entity.id, label: entity.reportLabel, km: 0, count: 0 })),
         { id: "unclassified", label: "Unclassified / legacy notes", km: 0, count: 0 }];
+      rows.forEach(row => {
+        row.programs = [...TRIP_PROGRAMS.map(program => ({ id: program.id, label: program.label, km: 0, count: 0 })),
+          { id: "other", label: "Other / legacy purpose", km: 0, count: 0 }];
+      });
       let totalKm = 0;
       trips.forEach(trip => {
         if (!trip) return;
@@ -3358,9 +3388,16 @@
         const row = rows.find(row => row.id === classifyTaxEntity(trip.notes));
         row.km += km;
         row.count++;
+        const parsed = parseAuditNotes(trip.notes);
+        const programId = parsed ? parsed.program :
+          (TRIP_PROGRAMS.find(program => program.label === classifyTripPurpose(trip.notes)) || {}).id;
+        const program = row.programs.find(program => program.id === (programId || "other"));
+        program.km += km;
+        program.count++;
         totalKm += km;
       });
-      return rows.map(row => ({ ...row, percent: totalKm > 0 ? row.km / totalKm * 100 : 0 }));
+      return rows.map(row => ({ ...row, percent: totalKm > 0 ? row.km / totalKm * 100 : 0,
+        programs: row.programs.map(program => ({ ...program, percent: row.km > 0 ? program.km / row.km * 100 : 0 })) }));
     }
 
     function renderEntityBreakdown(trips) {
@@ -3375,6 +3412,13 @@
             <span class="${row.id === "h4" ? "text-amber-300" : "text-emerald-300"} font-semibold">${row.km.toFixed(1)} km</span>
           </div>
           <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden"><div class="h-full ${row.id === "h4" ? "bg-amber-500" : row.id === "unclassified" ? "bg-slate-500" : "bg-emerald-500"}" style="width:${row.percent.toFixed(2)}%"></div></div>
+          <details class="rounded-lg border border-slate-800 px-3">
+            <summary class="min-h-[44px] flex items-center cursor-pointer text-xs text-slate-300" aria-label="Programs for ${escapeCategoryHtml(row.label)}">Program breakdown</summary>
+            <div class="space-y-2 pb-3">${row.count ? row.programs.filter(program => program.count > 0).map(program => `
+              <div class="text-xs space-y-1"><div class="text-slate-300">${escapeCategoryHtml(program.label)}</div>
+              <div class="flex justify-between gap-2 text-slate-400 tabular-nums"><span>${program.count} trip${program.count === 1 ? "" : "s"} · ${program.percent.toFixed(1)}% of entity km</span><span>${program.km.toFixed(1)} km</span></div></div>
+            `).join("") : '<p class="text-xs text-slate-500">No trips in this period.</p>'}</div>
+          </details>
         </div>`).join("");
     }
 

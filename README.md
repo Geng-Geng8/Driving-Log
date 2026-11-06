@@ -34,6 +34,16 @@ notes. Legacy notes stay unchanged until edited. Entity reports use the active d
 filter and show unclassified legacy notes separately; structured entity tags take
 precedence over names mentioned in the detail to avoid counting a trip twice.
 
+The portfolio contains SHSM Certifications, Dance Workshops, Leadership Workshops,
+Presentations & Keynotes, Cypher Program, Competitive Arts / BotB, B Thee Rise,
+Filipino Projects, Breaking Canada Events, Community & Misc Events, Sales & Outreach,
+and Admin & Governance. Switching to H4 defaults the program to Cypher Program.
+Switching to Sole Prop preserves a selected contract service (the first four programs)
+or defaults to SHSM Certifications. This applies to new trips and modal category edits;
+reloads preserve explicit selections. Older `SHSM` and `Admin / Governance` notes
+remain readable. Expand an entity's Program breakdown to see its program mileage
+and trip counts for the selected period.
+
 These labels support recordkeeping, not a determination of deductible expenses.
 [CRA vehicle records](https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/business-expenses/motor-vehicle-expenses/motor-vehicle-records.html)
 and receipts are still required. T2125 line 9281 covers eligible motor-vehicle expenses
