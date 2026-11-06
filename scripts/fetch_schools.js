@@ -32,7 +32,10 @@ const LANDMARKS = [
   { name: "CEC Board Office", address: "80 Sheppard Ave E", city: "North York", board: "TCDSB" },
   { name: "John Street Roundhouse", address: "255 Bremner Blvd", city: "Toronto", board: "GTA" },
   { name: "Toronto City Hall", address: "100 Queen St W", city: "Toronto", board: "GTA" },
-  { name: "Metro Hall", address: "55 John St", city: "Toronto", board: "GTA" }
+  { name: "Metro Hall", address: "55 John St", city: "Toronto", board: "GTA" },
+  { name: "Costco Wholesale Scarborough", address: "1411 Warden Ave", city: "Scarborough", board: "GTA" },
+  { name: "Long & McQuade Scarborough", address: "1133 Markham Rd", city: "Scarborough", board: "GTA" },
+  { name: "Dollarama (Brimley & Eglinton)", address: "2622 Eglinton Ave E", city: "Scarborough", board: "GTA" }
 ];
 
 function resolveBoardCode(boardName) {
@@ -44,6 +47,18 @@ function resolveBoardCode(boardName) {
     }
   }
   return null;
+}
+
+function mergeLocations(parsedSchools) {
+  const seen = new Set();
+  return [...LANDMARKS, ...parsedSchools].filter(item => {
+    const key = `${item.name.toLowerCase().trim()}|${item.address.toLowerCase().trim()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(item => ({ name: item.name.trim(), address: item.address.trim(),
+    city: item.city.trim(), board: item.board.trim() }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
 }
 
 // Pure Node.js ZIP decompressor using built-in zlib
@@ -286,25 +301,7 @@ async function main() {
 
   // 4. Retain Landmarks & Deduplicate
   console.log('4. Retaining non-school landmarks and deduplicating...');
-  const combined = [...LANDMARKS, ...parsedSchools];
-  const seen = new Set();
-  const deduped = [];
-
-  for (const item of combined) {
-    const key = `${item.name.toLowerCase().trim()}|${item.address.toLowerCase().trim()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      deduped.push({
-        name: item.name.trim(),
-        address: item.address.trim(),
-        city: item.city.trim(),
-        board: item.board.trim()
-      });
-    }
-  }
-
-  // Sort alphabetically by name
-  deduped.sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+  const deduped = mergeLocations(parsedSchools);
 
   // Count per board
   const boardCounts = {};
@@ -342,7 +339,11 @@ async function main() {
   console.log('\nPipeline completed successfully!');
 }
 
-main().catch(err => {
-  console.error('\nPipeline execution failed:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('\nPipeline execution failed:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { LANDMARKS, mergeLocations };

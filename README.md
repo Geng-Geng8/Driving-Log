@@ -21,3 +21,25 @@ node --test scripts/*.test.cjs
 
 Tests use simulated browser storage and Google services; they do not write to your sheet.
 After deploying Apps Script, verify one trip save, a Pending retry, and one edit in the app.
+
+## Trip categories and audit notes
+
+Choose one tax entity, program, and activity. The live preview is the exact Notes
+value saved to Column C: `Entity — Program — Activity: Detail`. Empty details use
+the selected activity's description. Category selections persist across trips and
+reloads; specific details clear after a completed or queued submission.
+
+The edit modal keeps direct Notes editing and offers category controls for structured
+notes. Legacy notes stay unchanged until edited. Entity reports use the active date
+filter and show unclassified legacy notes separately; structured entity tags take
+precedence over names mentioned in the detail to avoid counting a trip twice.
+
+These labels support recordkeeping, not a determination of deductible expenses.
+[CRA vehicle records](https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/business-expenses/motor-vehicle-expenses/motor-vehicle-records.html)
+and receipts are still required. T2125 line 9281 covers eligible motor-vehicle expenses
+excluding CCA; unreimbursed H4 activity is tracked separately and is not automatically
+a sole-proprietor deduction or a charitable gift.
+
+Costco Wholesale Scarborough, Long & McQuade Scarborough, and Dollarama (Brimley &
+Eglinton) are protected landmarks in the school-data generator and included in offline
+fallback search. `node scripts/fetch_schools.js` regenerates the dataset while retaining them.

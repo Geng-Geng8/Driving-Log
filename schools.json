@@ -1314,6 +1314,12 @@
     "board": "TDSB"
   },
   {
+    "name": "Costco Wholesale Scarborough",
+    "address": "1411 Warden Ave",
+    "city": "Scarborough",
+    "board": "GTA"
+  },
+  {
     "name": "Cottingham Junior Public School",
     "address": "85 Birch Ave",
     "city": "Toronto",
@@ -1540,6 +1546,12 @@
     "address": "315 The Westway",
     "city": "Etobicoke",
     "board": "TDSB"
+  },
+  {
+    "name": "Dollarama (Brimley & Eglinton)",
+    "address": "2622 Eglinton Ave E",
+    "city": "Scarborough",
+    "board": "GTA"
   },
   {
     "name": "Don Mills Collegiate Institute",
@@ -3508,6 +3520,12 @@
     "address": "571 Country Glen Road",
     "city": "Markham",
     "board": "YRDSB"
+  },
+  {
+    "name": "Long & McQuade Scarborough",
+    "address": "1133 Markham Rd",
+    "city": "Scarborough",
+    "board": "GTA"
   },
   {
     "name": "Lord Dufferin Junior and Senior Public School",

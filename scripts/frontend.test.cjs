@@ -19,7 +19,7 @@ function browser(fetch, { realSync = false } = {}) {
   function element(id) {
     if (!elements.has(id)) {
       const classes = new Set();
-      elements.set(id, { value:'', checked:true, addEventListener() {},
+      elements.set(id, { value:'', checked:true, style:{}, addEventListener() {}, querySelectorAll() { return []; },
         classList:{ add:(...names) => names.forEach(n => classes.add(n)), remove:(...names) => names.forEach(n => classes.delete(n)), toggle() {}, contains:n => classes.has(n) } });
     }
     return elements.get(id);
@@ -35,6 +35,8 @@ function browser(fetch, { realSync = false } = {}) {
   context.resets=0;
   context.realSync = context.syncWithGoogleSheet;
   context.realRender = context.renderRecentDrives;
+  context.realTaxDashboard = context.renderTaxDashboard;
+  context.realReset = context.resetTripForm;
   vm.runInContext(`
     isAuthorized = () => true;
     showAlert = (message,type) => alerts.push({message,type});
@@ -343,4 +345,106 @@ test('service worker never falls back to a cached Apps Script response',async ()
   vm.runInContext(fs.readFileSync(path.join(root,'sw.js'),'utf8'),context);
   let response;handlers.fetch({request:{url:'https://script.google.com/macros/s/test/exec?_refresh=1'},respondWith:p => {response=p;}});
   await assert.rejects(response,/offline/);assert.equal(matches,0);
+});
+
+test('default audit string, live preview and persisted single-select preferences agree',() => {
+  const c=browser();c.initializeTripCategorization();
+  const expected='Glen Reyes (Sole Prop) — SHSM — Workshop Delivery: Direct student instruction / workshop delivery';
+  assert.equal(c.getTripAuditNotes(),expected);
+  assert.equal(c.document.getElementById('craNotesPreview').textContent,expected);
+  c.selectTripCategory('trip','entity','h4');
+  c.selectTripCategory('trip','program','b-thee-rise');
+  c.selectTripCategory('trip','activity','gear');
+  c.document.getElementById('tripNoteInput').value='Sound pickup';c.updateCraNotesPreview();
+  assert.equal(c.getTripAuditNotes(),'H4 Community (Unreimbursed) — B Thee Rise — Gear & Equipment Run: Sound pickup');
+  assert.equal(c.document.getElementById('craNotesPreview').textContent,c.getTripAuditNotes());
+  c.initializeTripCategorization();
+  assert.equal(c.getTripAuditNotes(),'H4 Community (Unreimbursed) — B Thee Rise — Gear & Equipment Run: Sound pickup');
+});
+
+test('all seven activities use their exact default descriptions and user details replace them',() => {
+  const c=browser();const activities=vm.runInContext('TRIP_ACTIVITIES',c);
+  assert.equal(activities.length,7);
+  for(const activity of activities){
+    const state={entity:'sole-prop',program:'shsm',activity:activity.id};
+    assert.ok(c.buildAuditNotes(state).endsWith(activity.label+': '+activity.description));
+    assert.ok(c.buildAuditNotes(state,'  Specific detail: with — punctuation  ').endsWith(': Specific detail: with — punctuation'));
+    const parsed=c.parseAuditNotes(c.buildAuditNotes(state,'Specific detail: with — punctuation'));
+    assert.equal(parsed.activity,activity.id);assert.equal(parsed.detail,'Specific detail: with — punctuation');
+  }
+});
+
+test('recording a trip sends the exact structured notes into the save pipeline',async () => {
+  const c=browser();prepareRecord(c);let saved;
+  c.selectTripCategory('trip','entity','h4');c.selectTripCategory('trip','program','filipino');c.selectTripCategory('trip','activity','supplies');
+  c.document.getElementById('tripNoteInput').value='Snacks and prizes';
+  c.calculateRouteKm=async () => 18;c.saveTripToSheet=async p => {saved=p;};
+  await c.recordCircuit();
+  assert.equal(saved.notes,'H4 Community (Unreimbursed) — Filipino Projects — Supplies & Hospitality: Snacks and prizes');
+});
+
+test('trip reset clears only specific details and retains selected categories',() => {
+  const c=browser();c.selectTripCategory('trip','entity','h4');c.selectTripCategory('trip','activity','meeting');
+  c.document.getElementById('tripNoteInput').value='Custom meeting';
+  vm.runInContext('renderStops = () => {}; renderFrequentChips = () => {};',c);
+  c.realReset();
+  assert.equal(c.document.getElementById('tripNoteInput').value,'');
+  assert.match(c.document.getElementById('craNotesPreview').textContent,/H4 Community.*Governance, grant review, or accounting meeting$/);
+});
+
+test('edit modal parses structured notes, updates chips without changing raw text, and keeps edits separate',() => {
+  const c=browser();const notes='H4 Community (Unreimbursed) — Cypher Program — Workshop Delivery: Grade 11 class';
+  c.localStorage.setItem('cached_trips_data',JSON.stringify([{...trip('A'),notes,route:'School → Home'}]));
+  c.document.body={classList:{add() {},remove() {}}};
+  c.openEditTripModal('A');
+  assert.equal(c.document.getElementById('editTripNotes').value,notes);
+  assert.equal(vm.runInContext('editTripCategories.entity',c),'h4');
+  c.selectTripCategory('edit','activity','logistics');
+  assert.equal(c.document.getElementById('editTripNotes').value,'H4 Community (Unreimbursed) — Cypher Program — Artist / Youth Logistics: Grade 11 class');
+  assert.equal(vm.runInContext('tripCategories.entity',c),'sole-prop');
+});
+
+test('changing an edit activity replaces its old default but preserves legacy custom notes',() => {
+  const c=browser();const input=c.document.getElementById('editTripNotes');
+  input.value=c.buildAuditNotes({entity:'sole-prop',program:'shsm',activity:'workshop'});c.syncEditCategoryFromNotes();
+  c.selectTripCategory('edit','activity','gear');
+  assert.ok(input.value.endsWith('Gear & Equipment Run: Audio/visual gear rental, pickup, and return'));
+  input.value='Original custom note: visit with planner';c.syncEditCategoryFromNotes();
+  assert.equal(vm.runInContext('editTripCategories',c),null);
+  assert.equal(input.value,'Original custom note: visit with planner');
+  c.selectTripCategory('edit','entity','h4');
+  assert.ok(input.value.endsWith(': Original custom note: visit with planner'));
+});
+
+test('entity totals keep legacy notes unclassified and avoid detail-based double counting',() => {
+  const c=browser();const notes=c.buildAuditNotes({entity:'sole-prop',program:'shsm',activity:'workshop'},'Meeting with H4 Community');
+  const rows=c.calculateEntityBreakdown([{notes,totalKm:30},{notes:'Trip for H4 Community',km:20},{notes:'Glen Reyes errand',totalKm:10},{notes:'School visit',km:40}]);
+  assert.equal(rows.find(r=>r.id==='sole-prop').km,40);
+  assert.equal(rows.find(r=>r.id==='h4').percent,20);
+  assert.equal(rows.find(r=>r.id==='unclassified').km,40);
+  assert.equal(c.classifyTaxEntity('Glen Reyes and H4 Community'),'unclassified');
+  assert.ok(c.calculateEntityBreakdown([]).every(row=>row.percent===0));
+});
+
+test('entity report respects period filters and program reports use the selected program, not its detail',() => {
+  const c=browser();const notes=c.buildAuditNotes({entity:'sole-prop',program:'shsm',activity:'pitch'},'Discuss Cypher Program');
+  assert.equal(c.classifyTripPurpose(notes),'SHSM');
+  c.localStorage.setItem('driving_log_recent_trips',JSON.stringify([
+    {notes,totalKm:30,date:'2026-11-05'},
+    {notes:'H4 Community errand',totalKm:70,date:'2025-11-05'}
+  ]));
+  c.realTaxDashboard();
+  const card=c.document.getElementById('entityBreakdownList').innerHTML;
+  assert.match(card,/30\.0 km/);assert.match(card,/100\.0%/);assert.doesNotMatch(card,/70\.0 km/);
+});
+
+test('vendor hubs are searchable dataset entries and survive generator deduplication',() => {
+  const {LANDMARKS,mergeLocations}=require('./fetch_schools.js');
+  const locations=JSON.parse(fs.readFileSync(path.join(root,'schools.json'),'utf8'));
+  const expected=[['Costco Wholesale Scarborough','1411 Warden Ave'],['Long & McQuade Scarborough','1133 Markham Rd'],['Dollarama (Brimley & Eglinton)','2622 Eglinton Ave E']];
+  const refreshed=mergeLocations([{name:'New School',address:'1 School St',city:'Toronto',board:'TDSB'},...LANDMARKS]);
+  for(const [name,address] of expected){
+    assert.equal(locations.filter(item=>item.name===name&&item.address===address&&item.board==='GTA').length,1);
+    assert.equal(refreshed.filter(item=>item.name===name&&item.address===address&&item.board==='GTA').length,1);
+  }
 });

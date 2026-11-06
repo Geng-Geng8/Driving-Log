@@ -95,6 +95,22 @@
       -webkit-backdrop-filter: blur(16px);
     }
 
+    .trip-log-body { padding-bottom: calc(185px + env(safe-area-inset-bottom, 0px)); }
+    #bottomDockFooter { padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+    .category-radio { display: block; cursor: pointer; flex-shrink: 0; }
+    .category-radio input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .category-radio span {
+      display: flex; align-items: center; justify-content: center; min-height: 46px;
+      height: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #334155;
+      background: #1e293b; color: #cbd5e1; font-size: 12px; line-height: 1.35;
+    }
+    .category-radio input:checked + span { background: rgb(16 185 129 / .2); color: #6ee7b7; border-color: #10b981; }
+    .category-radio.entity-h4 input:checked + span { background: rgb(245 158 11 / .16); color: #fcd34d; border-color: #f59e0b; }
+    .category-radio input:focus-visible + span { outline: 2px solid #e2e8f0; outline-offset: 3px; }
+    .category-carousel { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; }
+    .category-activities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .category-activities .category-radio span { justify-content: flex-start; }
+
     /* Subtle Muted Slate Micro-Labels */
     .micro-label {
       color: #64748b;
@@ -398,7 +414,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen pb-32 antialiased selection:bg-brand-500/30">
+<body class="trip-log-body min-h-screen antialiased selection:bg-brand-500/30">
 
   <!-- Floating Auto-Dismiss Toast Notification -->
   <div 
@@ -657,23 +673,25 @@
       >
     </section>
 
-    <!-- Purpose & Quick Notes -->
-    <section class="glass-card p-4 space-y-3">
-      <div class="micro-label">Trip Purpose & Notes</div>
-      <div id="purposeTagsContainer" class="flex flex-wrap gap-2">
-        <button type="button" data-purpose="SHSM Workshop" onclick="appendNote('SHSM Workshop')" class="pill-slate"># SHSM Workshop</button>
-        <button type="button" data-purpose="Cypher Program" onclick="appendNote('Cypher Program')" class="pill-slate"># Cypher Program</button>
-        <button type="button" data-purpose="Board Meeting" onclick="appendNote('Board Meeting')" class="pill-slate"># Board Meeting</button>
-        <button type="button" data-purpose="Site Visit" onclick="appendNote('Site Visit')" class="pill-slate"># Site Visit</button>
+    <section id="tripPurposeSection" class="glass-card p-4 space-y-4">
+      <fieldset class="space-y-2">
+        <legend class="micro-label">1 · Tax Entity</legend>
+        <div id="tripEntityOptions" class="grid grid-cols-2 gap-2"></div>
+      </fieldset>
+      <fieldset class="space-y-2 min-w-0">
+        <legend class="micro-label">2 · Program</legend>
+        <div id="tripProgramOptions" class="category-carousel"></div>
+      </fieldset>
+      <fieldset class="space-y-2">
+        <legend class="micro-label">3 · Activity</legend>
+        <div id="tripActivityOptions" class="category-activities"></div>
+      </fieldset>
+      <div class="space-y-2">
+        <label for="tripNoteInput" class="micro-label">Specific Detail</label>
+        <input type="text" id="tripNoteInput" oninput="updateCraNotesPreview()"
+          placeholder="Optional specific detail (e.g. 3-hr Grade 11 class, sound pickup)"
+          class="w-full input-automotive px-3.5 py-2.5">
       </div>
-
-      <input 
-        type="text" 
-        id="tripNoteInput" 
-        oninput="syncPurposeTagStates()"
-        placeholder="e.g. Student workshop delivery & mentor review" 
-        class="w-full input-automotive px-3.5 py-2.5"
-      >
     </section>
 
     <!-- Sheet Sync Notice (shown if Apps Script returns write-only healthcheck) -->
@@ -814,6 +832,13 @@
         </div>
       </section>
 
+      <section class="glass-card p-4 space-y-3.5" aria-labelledby="entityBreakdownTitle">
+        <div id="entityBreakdownTitle" class="micro-label">Entity Breakdown</div>
+        <p class="text-xs text-slate-400">Share of logged kilometres in the selected period.</p>
+        <div id="entityBreakdownList" class="space-y-3"></div>
+        <p class="text-[11px] text-slate-400">Categories support recordkeeping; they do not determine deductibility. Keep receipts and vehicle records.</p>
+      </section>
+
       <!-- 4. Purpose Breakdown Card -->
       <section class="glass-card p-4 space-y-3.5">
         <div class="flex items-center justify-between">
@@ -855,6 +880,10 @@
   <!-- Floating Bottom Primary Dock -->
   <footer id="bottomDockFooter" class="fixed bottom-0 inset-x-0 glass-dock px-4 pt-3 pb-4 z-40" onclick="handleFooterClick(event)">
     <div class="max-w-md mx-auto">
+      <div class="p-2.5 mb-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs" aria-live="polite" aria-atomic="true">
+        <span class="text-slate-400">CRA Audit String:</span>
+        <span id="craNotesPreview" class="text-emerald-400 font-mono font-medium block mt-0.5 truncate"></span>
+      </div>
       <button 
         id="submitDriveBtn" 
         onclick="recordCircuit()" 
@@ -978,8 +1007,17 @@
 
         <div>
           <label for="editTripNotes" class="block text-xs font-medium text-slate-400 mb-1">Purpose / Notes</label>
-          <input type="text" id="editTripNotes" class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]" placeholder="e.g. # SHSM Workshop, Site Visit">
+          <input type="text" id="editTripNotes" oninput="syncEditCategoryFromNotes()" class="w-full input-automotive px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl focus:border-emerald-500 focus:outline-none min-h-[44px]" placeholder="Edit notes directly or use the categories below">
         </div>
+        <details id="editCategoryAccordion" class="rounded-xl border border-slate-700 p-3">
+          <summary class="min-h-[44px] cursor-pointer text-sm font-medium text-slate-200">Entity, program &amp; activity</summary>
+          <p id="editCategoryHint" class="text-xs text-slate-400 mb-3"></p>
+          <div class="space-y-3">
+            <fieldset><legend class="micro-label mb-2">Tax Entity</legend><div id="editEntityOptions" class="grid grid-cols-2 gap-2"></div></fieldset>
+            <fieldset class="min-w-0"><legend class="micro-label mb-2">Program</legend><div id="editProgramOptions" class="category-carousel"></div></fieldset>
+            <fieldset><legend class="micro-label mb-2">Activity</legend><div id="editActivityOptions" class="category-activities"></div></fieldset>
+          </div>
+        </details>
       </form>
 
       <!-- Sticky Footer -->
@@ -1003,6 +1041,10 @@
     };
 
     const PRESET_SCHOOLS = [
+      // Vendor hubs remain available if the full local dataset cannot load.
+      { name: "Costco Wholesale Scarborough", address: "1411 Warden Ave", city: "Scarborough", board: "GTA" },
+      { name: "Long & McQuade Scarborough", address: "1133 Markham Rd", city: "Scarborough", board: "GTA" },
+      { name: "Dollarama (Brimley & Eglinton)", address: "2622 Eglinton Ave E", city: "Scarborough", board: "GTA" },
       // Frequent / Primary Rotation
       { name: "Chaminade College", address: "490 Queen's Dr", city: "North York", board: "TCDSB", frequent: true },
       { name: "CEC Board Office", address: "80 Sheppard Ave E", city: "North York", board: "TCDSB", frequent: true },
@@ -1070,6 +1112,7 @@
       checkMagicLinkAuthorization();
       applyAuthorizationState();
       loadSettings();
+      initializeTripCategorization();
       loadOdometerBaseline();
       renderOriginUI();
       renderStops();
@@ -1541,7 +1584,7 @@
 
     async function loadLocalSchools() {
       try {
-        const res = await fetch("./schools.json");
+        const res = await fetch("./schools.json", { cache: "no-cache" });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -1801,20 +1844,132 @@
       renderStops();
     }
 
-    function appendNote(tag) {
-      const input = document.getElementById("tripNoteInput");
-      input.value = input.value ? `${input.value} • ${tag}` : tag;
-      syncPurposeTagStates();
+    const TAX_ENTITIES = [
+      { id: "sole-prop", label: "Glen Reyes (Sole Prop)", reportLabel: "Glen Reyes (Sole Prop - T2125 Line 9281)" },
+      { id: "h4", label: "H4 Community (Unreimbursed)", reportLabel: "H4 Community (Unreimbursed NPO)" }
+    ];
+    const TRIP_PROGRAMS = [
+      { id: "shsm", label: "SHSM" },
+      { id: "cypher", label: "Cypher Program" },
+      { id: "b-thee-rise", label: "B Thee Rise" },
+      { id: "competitive", label: "Competitive Arts / BotB" },
+      { id: "filipino", label: "Filipino Projects" },
+      { id: "sales", label: "Sales & Outreach" },
+      { id: "admin", label: "Admin / Governance" }
+    ];
+    const TRIP_ACTIVITIES = [
+      { id: "workshop", label: "Workshop Delivery", description: "Direct student instruction / workshop delivery" },
+      { id: "pitch", label: "Teacher Pitch / Sales", description: "Outreach meeting with school staff / planner drop-off" },
+      { id: "event", label: "Event Production / Judging", description: "Event coordination, sound setup, judging, or MCing" },
+      { id: "gear", label: "Gear & Equipment Run", description: "Audio/visual gear rental, pickup, and return" },
+      { id: "supplies", label: "Supplies & Hospitality", description: "Purchasing workshop snacks, prizes, and event items" },
+      { id: "meeting", label: "Funder / Partner Meeting", description: "Governance, grant review, or accounting meeting" },
+      { id: "logistics", label: "Artist / Youth Logistics", description: "Transporting youth leaders or guest talent between hubs" }
+    ];
+    const CATEGORY_OPTIONS = { entity: TAX_ENTITIES, program: TRIP_PROGRAMS, activity: TRIP_ACTIVITIES };
+    let tripCategories = { entity: "sole-prop", program: "shsm", activity: "workshop" };
+    let editTripCategories = null;
+
+    function normalizeCategories(candidate = {}) {
+      candidate = candidate || {};
+      const selection = {};
+      Object.entries(CATEGORY_OPTIONS).forEach(([tier, options]) => {
+        selection[tier] = options.some(option => option.id === candidate[tier]) ? candidate[tier] : options[0].id;
+      });
+      return selection;
     }
 
-    function syncPurposeTagStates() {
-      const input = document.getElementById("tripNoteInput");
-      const val = (input ? input.value : "").toLowerCase();
-      const buttons = document.querySelectorAll("#purposeTagsContainer button[data-purpose]");
-      buttons.forEach(btn => {
-        const tag = (btn.getAttribute("data-purpose") || "").toLowerCase();
-        btn.classList.toggle("is-selected", Boolean(tag && val.includes(tag)));
+    function buildAuditNotes(selection, detail = "") {
+      const normalized = normalizeCategories(selection);
+      const entity = TAX_ENTITIES.find(option => option.id === normalized.entity);
+      const program = TRIP_PROGRAMS.find(option => option.id === normalized.program);
+      const activity = TRIP_ACTIVITIES.find(option => option.id === normalized.activity);
+      return `${entity.label} — ${program.label} — ${activity.label}: ${String(detail).trim() || activity.description}`;
+    }
+
+    function parseAuditNotes(notes) {
+      const match = String(notes || "").match(/^(.+?) — (.+?) — (.+?):\s*([\s\S]*)$/);
+      if (!match) return null;
+      const selection = {};
+      for (const [index, tier] of ["entity", "program", "activity"].entries()) {
+        const option = CATEGORY_OPTIONS[tier].find(option => option.label === match[index + 1].trim());
+        if (!option) return null;
+        selection[tier] = option.id;
+      }
+      return { ...selection, detail: match[4].trim() };
+    }
+
+    function escapeCategoryHtml(text) {
+      return String(text).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+    }
+
+    function renderCategoryControls(scope) {
+      Object.entries(CATEGORY_OPTIONS).forEach(([tier, options]) => {
+        const container = document.getElementById(scope + tier[0].toUpperCase() + tier.slice(1) + "Options");
+        if (!container) return;
+        container.innerHTML = options.map(option => `<label class="category-radio${tier === "entity" && option.id === "h4" ? " entity-h4" : ""}">
+          <input type="radio" name="${scope}-${tier}" value="${option.id}" onchange="selectTripCategory('${scope}', '${tier}', this.value)">
+          <span>${escapeCategoryHtml(option.label)}</span></label>`).join("");
       });
+      syncCategoryControls(scope);
+    }
+
+    function syncCategoryControls(scope) {
+      const selected = scope === "edit" ? editTripCategories : tripCategories;
+      Object.keys(CATEGORY_OPTIONS).forEach(tier => {
+        const container = document.getElementById(scope + tier[0].toUpperCase() + tier.slice(1) + "Options");
+        if (container) container.querySelectorAll('input[type="radio"]').forEach(input => {
+          input.checked = Boolean(selected && selected[tier] === input.value);
+        });
+      });
+    }
+
+    function initializeTripCategorization() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("driving_log_category_preferences") || "{}");
+        tripCategories = normalizeCategories(saved && typeof saved === "object" ? saved : {});
+      } catch (error) {
+        tripCategories = normalizeCategories();
+      }
+      renderCategoryControls("trip");
+      updateCraNotesPreview();
+    }
+
+    function selectTripCategory(scope, tier, value) {
+      if (!CATEGORY_OPTIONS[tier] || !CATEGORY_OPTIONS[tier].some(option => option.id === value)) return;
+      if (scope === "trip") {
+        tripCategories[tier] = value;
+        try { localStorage.setItem("driving_log_category_preferences", JSON.stringify(tripCategories)); } catch (error) { /* Selection still works for this session. */ }
+        syncCategoryControls("trip");
+        updateCraNotesPreview();
+      } else if (scope === "edit") {
+        if (!editTripCategories) editTripCategories = { ...normalizeCategories(), detail: document.getElementById("editTripNotes").value.trim() };
+        const previous = TRIP_ACTIVITIES.find(option => option.id === editTripCategories.activity);
+        if (tier === "activity" && editTripCategories.detail === previous.description) editTripCategories.detail = "";
+        editTripCategories[tier] = value;
+        document.getElementById("editTripNotes").value = buildAuditNotes(editTripCategories, editTripCategories.detail);
+        syncEditCategoryFromNotes();
+      }
+    }
+
+    function getTripAuditNotes() {
+      return buildAuditNotes(tripCategories, document.getElementById("tripNoteInput").value);
+    }
+
+    function updateCraNotesPreview() {
+      const preview = document.getElementById("craNotesPreview");
+      if (preview) {
+        preview.textContent = getTripAuditNotes();
+        preview.title = preview.textContent;
+      }
+    }
+
+    function syncEditCategoryFromNotes() {
+      editTripCategories = parseAuditNotes(document.getElementById("editTripNotes").value);
+      syncCategoryControls("edit");
+      const hint = document.getElementById("editCategoryHint");
+      if (hint) hint.textContent = editTripCategories ? "Selections match these notes. You can also edit the text directly." :
+        "Custom notes are preserved. Choosing a category will keep these notes as the specific detail.";
     }
 
     // -------------------------------------------------------------
@@ -2163,7 +2318,7 @@
 
         const originAddr = getActiveOriginAddress();
         const isReturn = document.getElementById("returnHomeToggle").checked;
-        const note = document.getElementById("tripNoteInput").value.trim() || "School Visit Circuit";
+        const note = getTripAuditNotes();
         const selectedDate = document.getElementById("tripDateInput").value || getTodayDateString();
 
         const routeAddresses = [originAddr];
@@ -2321,7 +2476,7 @@
       setTripDateToToday();
       renderStops();
       renderFrequentChips();
-      syncPurposeTagStates();
+      updateCraNotesPreview();
     }
 
     function setSubmittingState(active, label = "Calculating KM...") {
@@ -2793,6 +2948,10 @@
       const stopsVal = parseInt(trip.stops !== undefined ? trip.stops : (trip.stopCount || 2), 10) || 2;
       document.getElementById("editTripStops").value = stopsVal;
       document.getElementById("editTripNotes").value = trip.notes || "";
+      editTripCategories = parseAuditNotes(trip.notes);
+      renderCategoryControls("edit");
+      syncEditCategoryFromNotes();
+      document.getElementById("editCategoryAccordion").open = false;
 
       const modal = document.getElementById("editTripModal");
       if (modal) {
@@ -2946,8 +3105,7 @@
     // TAX & REPORTS DASHBOARD (PURE CLIENT-SIDE AGGREGATION)
     // -------------------------------------------------------------
     const PURPOSE_CATEGORIES = [
-      { id: "shsm", label: "# SHSM Workshop", match: ["shsm workshop", "shsm"] },
-      { id: "cypher", label: "# Cypher Program", match: ["cypher program", "cypher"] },
+      ...TRIP_PROGRAMS.map(option => ({ ...option, match: [option.label.toLowerCase()] })),
       { id: "board", label: "# Board Meeting", match: ["board meeting", "board"] },
       { id: "site", label: "# Site Visit", match: ["site visit"] },
       { id: "other", label: "Other", match: [] }
@@ -3178,7 +3336,51 @@
       });
     }
 
+    function classifyTaxEntity(notes) {
+      const parsed = parseAuditNotes(notes);
+      if (parsed) return parsed.entity;
+      const text = String(notes || "");
+      const soleProp = /\bGlen Reyes\b/i.test(text);
+      const h4 = /\bH4 Community\b/i.test(text);
+      if (soleProp && !h4) return "sole-prop";
+      if (h4 && !soleProp) return "h4";
+      return "unclassified";
+    }
+
+    function calculateEntityBreakdown(trips) {
+      const rows = [...TAX_ENTITIES.map(entity => ({ id: entity.id, label: entity.reportLabel, km: 0, count: 0 })),
+        { id: "unclassified", label: "Unclassified / legacy notes", km: 0, count: 0 }];
+      let totalKm = 0;
+      trips.forEach(trip => {
+        if (!trip) return;
+        const km = Number(trip.totalKm !== undefined ? trip.totalKm : trip.km);
+        if (!Number.isFinite(km) || km < 0) return;
+        const row = rows.find(row => row.id === classifyTaxEntity(trip.notes));
+        row.km += km;
+        row.count++;
+        totalKm += km;
+      });
+      return rows.map(row => ({ ...row, percent: totalKm > 0 ? row.km / totalKm * 100 : 0 }));
+    }
+
+    function renderEntityBreakdown(trips) {
+      const container = document.getElementById("entityBreakdownList");
+      if (!container) return;
+      container.innerHTML = calculateEntityBreakdown(trips)
+        .filter(row => row.id !== "unclassified" || row.count > 0)
+        .map(row => `<div class="space-y-1.5">
+          <div class="text-xs text-slate-300 font-medium">${escapeCategoryHtml(row.label)}</div>
+          <div class="flex items-center justify-between text-xs tabular-nums">
+            <span class="text-slate-400">${row.percent.toFixed(1)}% · ${row.count} trip${row.count === 1 ? "" : "s"}</span>
+            <span class="${row.id === "h4" ? "text-amber-300" : "text-emerald-300"} font-semibold">${row.km.toFixed(1)} km</span>
+          </div>
+          <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden"><div class="h-full ${row.id === "h4" ? "bg-amber-500" : row.id === "unclassified" ? "bg-slate-500" : "bg-emerald-500"}" style="width:${row.percent.toFixed(2)}%"></div></div>
+        </div>`).join("");
+    }
+
     function classifyTripPurpose(notes) {
+      const parsed = parseAuditNotes(notes);
+      if (parsed) return TRIP_PROGRAMS.find(option => option.id === parsed.program).label;
       const n = String(notes || "").toLowerCase();
       for (let i = 0; i < PURPOSE_CATEGORIES.length - 1; i++) {
         const cat = PURPOSE_CATEGORIES[i];
@@ -3205,6 +3407,7 @@
       }
 
       const filteredTrips = Array.isArray(allTrips) ? filterTripsByPeriod(allTrips, currentTaxFilter) : [];
+      renderEntityBreakdown(filteredTrips);
 
       // 1. Business KM Logged
       const businessKm = (Array.isArray(filteredTrips) ? filteredTrips : []).reduce((sum, t) => {
