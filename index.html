@@ -1057,7 +1057,6 @@
     let currentOrigin = null; // null = default home, or { name: string, address: string }
     let currentStops = [];
     let isSubmitting = false;
-    let isFlushingQueue = false;
     let searchDebounceTimer = null;
     let alertDismissTimer = null;
     let currentAppView = "log"; // 'log' | 'tax'
@@ -2191,7 +2190,7 @@
       const btnText = document.getElementById("btnText");
       if (btnText) btnText.innerText = "Saving to Sheet...";
 
-      const cleanTripId = "TRIP-" + tripData.date.replace(/-/g, "") + "-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+      const cleanTripId = createTripId(tripData.date);
 
       const payload = {
         id: cleanTripId,
@@ -2210,6 +2209,14 @@
       let confirmedKm = tripData.totalKm;
       let confirmedTripId = cleanTripId;
 
+      // Save the ID before dispatch so a lost response/reload can retry the same trip.
+      try {
+        enqueueOfflineTrip(payload);
+      } catch (err) {
+        showAlert("Could not keep this trip on your device. Nothing was sent; your form is still here.", "warning");
+        return;
+      }
+
       try {
         const response = await fetch(scriptUrl, {
           method: "POST",
@@ -2221,12 +2228,20 @@
           const data = await response.json();
           if (data.success === true || data.status === "success") {
             isSuccess = true;
-            if (data.totalKm && !isNaN(Number(data.totalKm)) && Number(data.totalKm) > 0) {
-              confirmedKm = Number(data.totalKm);
+            const saved = data.trip || data;
+            confirmedKm = Number(saved.totalKm);
+            confirmedTripId = saved.tripId || saved.id || cleanTripId;
+            removeQueuedTrip(cleanTripId);
+            if (!Number.isFinite(confirmedKm) || confirmedKm <= 0) {
+              resetTripForm();
+              showAlert("Server reported saved, but mileage is missing or 0. Check this trip in the sheet before recording again and deploy the updated Code.gs.", "warning");
+              syncWithGoogleSheet(false);
+              return;
             }
-            if (data.tripId || data.id) {
-              confirmedTripId = data.tripId || data.id;
-            }
+          } else if (data.retryable !== true) {
+            removeQueuedTrip(cleanTripId);
+            showAlert(data.error || data.message || "Server rejected this trip. Check the route and try again.", "warning");
+            return;
           }
         }
       } catch (err) {
@@ -2249,13 +2264,6 @@
         resetTripForm();
         syncWithGoogleSheet(false);
       } else {
-        // Enqueue to pending queue with confirmed valid distance and unique ID
-        payload.id = confirmedTripId;
-        payload.tripId = confirmedTripId;
-        payload.totalKm = confirmedKm;
-        payload.km = confirmedKm;
-        enqueueOfflineTrip(payload);
-
         saveToRecentHistory({
           id: confirmedTripId,
           tripId: confirmedTripId,
@@ -2267,7 +2275,7 @@
           notes: tripData.notes,
           synced: false
         });
-        showAlert("Offline: Drive queued for sync. Will sync when connection resumes.", "warning");
+        showAlert("Save not confirmed. Trip kept pending; retry it from Pending instead of recording it again.", "warning");
         resetTripForm();
       }
     }
@@ -2301,6 +2309,13 @@
     // -------------------------------------------------------------
     // TRUE PENDING QUEUE MANAGEMENT
     // -------------------------------------------------------------
+    function createTripId(date) {
+      const suffix = globalThis.crypto && globalThis.crypto.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+      return "TRIP-" + (date || "").replace(/-/g, "") + "-" + suffix;
+    }
+
     function getPendingQueue() {
       try {
         const raw = localStorage.getItem("pending_trips_queue") || localStorage.getItem("driving_log_queue") || "[]";
@@ -2322,8 +2337,7 @@
     function enqueueOfflineTrip(payload) {
       const queue = getPendingQueue();
       if (!payload.id && !payload.tripId) {
-        const dateStr = (payload.date || "").replace(/-/g, "");
-        const genId = "TRIP-" + dateStr + "-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+        const genId = createTripId(payload.date);
         payload.id = genId;
         payload.tripId = genId;
       }
@@ -2332,6 +2346,12 @@
         queue.push(payload);
       }
       savePendingQueue(queue);
+    }
+
+    function removeQueuedTrip(targetId) {
+      // Re-read after each response: new trips may have arrived during the request.
+      savePendingQueue(getPendingQueue().filter(item =>
+        (item.id || item.tripId) !== targetId));
     }
 
     function updateOfflineQueueBadge() {
@@ -2353,55 +2373,63 @@
     let isProcessingPendingQueue = false;
 
     async function processPendingQueue() {
-      if (isProcessingPendingQueue) return;
+      if (isProcessingPendingQueue || isSubmitting || !isAuthorized()) return;
       let queue = getPendingQueue();
       if (queue.length === 0) {
         updateOfflineQueueBadge();
         return;
       }
 
+      // Give legacy entries distinct persisted IDs before starting any requests.
+      let migrated = false;
+      queue.forEach(item => {
+        if (!item.id && !item.tripId) {
+          item.id = item.tripId = createTripId(item.date);
+          migrated = true;
+        }
+      });
+      if (migrated) savePendingQueue(queue);
+
       isProcessingPendingQueue = true;
       const badge = document.getElementById("offlineQueueBadge");
       if (badge) badge.classList.add("opacity-60");
 
       const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
-      let remaining = [...queue];
       let syncedCount = 0;
 
-      for (const item of queue) {
-        try {
-          if (!item.secret) {
+      try {
+        for (const item of queue) {
+          try {
             item.secret = localStorage.getItem("driving_log_secret") || "";
-          }
 
-          const res = await fetch(scriptUrl, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(item)
-          });
+            const res = await fetch(scriptUrl, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify(item)
+            });
 
-          // Once a queued trip receives a 200 response from Google Apps Script
-          if (res.ok) { // 200 response
-            const data = await res.json();
-            if (data.success === true || data.status === "success") {
-              syncedCount++;
-              const targetId = item.id || item.tripId;
-              // Explicitly filter it out and persist the trimmed array back
-              remaining = remaining.filter(q => (q.id || q.tripId) !== targetId);
-              savePendingQueue(remaining);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success === true || data.status === "success") {
+                syncedCount++;
+                const targetId = item.id || item.tripId;
+                removeQueuedTrip(targetId);
 
-              // Mark trip as confirmed in local history / cached_trips_data
-              markTripAsSyncedInLocalHistory(targetId, data.tripId || data.id);
+                const saved = data.trip || data;
+                markTripAsSyncedInLocalHistory(targetId, saved.tripId || saved.id);
+              } else {
+                showAlert(data.error || data.message || "A trip could not sync and remains pending.", "warning");
+              }
             }
+          } catch (e) {
+            console.warn("Queue item sync error:", e);
           }
-        } catch (e) {
-          console.warn("Queue item sync error:", item, e);
         }
+      } finally {
+        if (badge) badge.classList.remove("opacity-60");
+        isProcessingPendingQueue = false;
+        updateOfflineQueueBadge();
       }
-
-      savePendingQueue(remaining);
-      if (badge) badge.classList.remove("opacity-60");
-      isProcessingPendingQueue = false;
 
       // Re-render UI to reflect updated queue and confirmed synced statuses
       renderRecentDrives();
@@ -2769,6 +2797,7 @@
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({
             action: "update",
+            secret: localStorage.getItem("driving_log_secret") || "",
             id: tripId,
             date: newDate,
             route: newRoute,
@@ -3312,7 +3341,7 @@
       }
     }
 
-    const APPS_SCRIPT_SOURCE = "/**\n * DRIVING LOG - GOOGLE APPS SCRIPT (Code.gs)\n * ==============================================================================\n * This script connects directly to your Google Sheet \"Trips\".\n *\n * GOOGLE SHEET COLUMNS (Row 1 headers):\n * A: Trip ID   | B: Date   | C: Notes   | D: Route   | E: Stops   | F: Total KM\n *\n * HOW TO DEPLOY / UPDATE IN GOOGLE SHEETS:\n * 1. In your Google Sheet, click \"Extensions\" > \"Apps Script\".\n * 2. Select all text in \"Code.gs\" and replace it with this entire file.\n * 3. Click \"Save\" (floppy disk icon).\n * 4. Click \"Deploy\" > \"Manage deployments\".\n * 5. Click the pencil icon (Edit) on your Active deployment.\n * 6. Under \"Version\", select \"New version\".\n * 7. Ensure \"Execute as\": \"Me\" and \"Who has access\": \"Anyone\".\n * 8. Click \"Deploy\".\n *\n * ONE-CLICK RETROACTIVE ROUTE CLEANUP:\n * To clean up Column D in all existing rows (e.g. converting addresses like\n * \"80 Sheppard Ave E\" into \"CEC Board Office -> Home\"):\n * 1. Select \"cleanExistingRoutesInSheet\" from the Apps Script toolbar dropdown.\n * 2. Click \"Run\" (▶).\n * ==============================================================================\n */\n\nconst SHEET_NAME = \"Trips\";\n\n// Mapping of known GTA school / building addresses to clean friendly names\nconst KNOWN_LOCATIONS = [\n  { name: \"CEC Board Office\", patterns: [\"80 Sheppard\", \"CEC Board\", \"Sheppard Ave E\"] },\n  { name: \"Chaminade College\", patterns: [\"490 Queen\", \"Chaminade\"] },\n  { name: \"St. John Paul II\", patterns: [\"685 Military\", \"John Paul\"] },\n  { name: \"St. Columba\", patterns: [\"1054 Military\", \"Columba\"] },\n  { name: \"St. Mother Teresa\", patterns: [\"440 Sewell\", \"Mother Teresa\"] },\n  { name: \"Madonna CSS\", patterns: [\"20 Cresswell\", \"Madonna\"] },\n  { name: \"St. Basil-the-Great\", patterns: [\"20 Weston\", \"Basil\"] },\n  { name: \"Maria Goretti\", patterns: [\"21 Tabor\", \"Goretti\"] },\n  { name: \"St. Agatha\", patterns: [\"Agatha\"] },\n  { name: \"St. Nicholas\", patterns: [\"Nicholas\"] },\n  { name: \"Notre Dame CSS (Ajax)\", patterns: [\"1375 Harwood\", \"Harwood Ave\"] },\n  { name: \"Notre Dame HS (Toronto)\", patterns: [\"12 Malvern\", \"Malvern Ave\"] },\n  { name: \"Notre Dame CSS (Brampton)\", patterns: [\"2 Notre Dame Ave\", \"2 Notre Dame\"] },\n  { name: \"St. Mary CSS (Pickering)\", patterns: [\"1918 Whites\", \"Whites Rd\"] },\n  { name: \"St. Mary Academy (Toronto)\", patterns: [\"66 Dufferin Park\", \"Dufferin Park Ave\"] },\n  { name: \"St. Joan of Arc (Scarborough)\", patterns: [\"959 Midland\", \"Midland Ave\"] },\n  { name: \"St. Joan of Arc (Mississauga)\", patterns: [\"3801 Thomas\", \"Thomas St\"] },\n  { name: \"St. Joseph's College (Toronto)\", patterns: [\"74 Wellesley\", \"Wellesley St\"] },\n  { name: \"St. Joseph Secondary (Mississauga)\", patterns: [\"5555 Creditview\", \"Creditview Rd\"] },\n  { name: \"St. Francis Xavier (Mississauga)\", patterns: [\"50 Bristol\", \"Bristol Rd\"] },\n  { name: \"Pine Ridge SS\", patterns: [\"2155 Liverpool\", \"Liverpool Rd\"] },\n  { name: \"Pickering HS\", patterns: [\"180 Church\", \"Church St N\"] },\n  { name: \"Milliken Mills HS\", patterns: [\"7522 Kennedy\", \"Milliken Mills\"] },\n  { name: \"Downtown Office\", patterns: [\"100 Queen\", \"City Hall\"] }\n];\n\n/**\n * Handle GET requests: Return all logged trips from the Google Sheet\n */\nfunction doGet(e) {\n  try {\n    const ss = SpreadsheetApp.getActiveSpreadsheet();\n    let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];\n\n    const data = sheet.getDataRange().getValues();\n\n    if (data.length \u003c= 1) {\n      return createJsonResponse({\n        status: \"success\",\n        sheetUrl: ss.getUrl(),\n        totalKm: 0,\n        count: 0,\n        trips: []\n      });\n    }\n\n    // Inspect headers (row 0)\n    const headers = data[0].map(h => String(h || \"\").trim().toLowerCase());\n    \n    let idIdx = headers.findIndex(h => h.includes(\"trip id\") || h === \"id\");\n    let dateIdx = headers.findIndex(h => h === \"date\" || h.includes(\"trip date\"));\n    let notesIdx = headers.findIndex(h => h.includes(\"note\") || h.includes(\"purpose\"));\n    let routeIdx = headers.findIndex(h => h.includes(\"route\") || (h.includes(\"stop\") && !h.includes(\"count\")));\n    let stopsCountIdx = headers.findIndex(h => h === \"stops\" || h.includes(\"count\"));\n    let kmIdx = headers.findIndex(h => h.includes(\"km\") || h.includes(\"distance\") || h.includes(\"mileage\"));\n\n    // Fallbacks matching your exact sheet: A: Trip ID, B: Date, C: Notes, D: Route, E: Stops, F: Total KM\n    if (idIdx === -1) idIdx = 0;\n    if (dateIdx === -1) dateIdx = 1;\n    if (notesIdx === -1) notesIdx = 2;\n    if (routeIdx === -1) routeIdx = 3;\n    if (stopsCountIdx === -1) stopsCountIdx = 4;\n    if (kmIdx === -1) kmIdx = 5;\n\n    const trips = [];\n    let totalKm = 0;\n\n    // Read rows from bottom to top (most recent first)\n    for (let i = data.length - 1; i >= 1; i--) {\n      const row = data[i];\n      if (!row || row.length === 0) continue;\n\n      const hasContent = row.some(cell => cell !== \"\" && cell !== null && cell !== undefined);\n      if (!hasContent) continue;\n\n      const kmVal = Number(row[kmIdx]) || 0;\n      totalKm += kmVal;\n\n      let rawDate = row[dateIdx];\n      let formattedDate = \"\";\n      if (rawDate instanceof Date) {\n        formattedDate = Utilities.formatDate(rawDate, \"America/Toronto\", \"yyyy-MM-dd\");\n      } else if (rawDate) {\n        formattedDate = String(rawDate).slice(0, 10);\n      }\n\n      const rawRoute = String(row[routeIdx] || \"\");\n      const cleanedRoute = cleanRouteString(rawRoute);\n\n      trips.push({\n        tripId: String(row[idIdx] || `ROW-${i}`),\n        date: formattedDate,\n        notes: String(row[notesIdx] || \"\"),\n        route: cleanedRoute,\n        stops: cleanedRoute,\n        stopsCount: Number(row[stopsCountIdx]) || 0,\n        km: Number(kmVal.toFixed(1)),\n        synced: true\n      });\n    }\n\n    return createJsonResponse({\n      status: \"success\",\n      sheetUrl: ss.getUrl(),\n      totalKm: Number(totalKm.toFixed(1)),\n      count: trips.length,\n      trips: trips\n    });\n\n  } catch (err) {\n    return createJsonResponse({\n      status: \"error\",\n      message: err.toString()\n    });\n  }\n}\n\n/**\n * Handle POST requests: Calculate mileage and log a new trip to the sheet\n */\nfunction doPost(e) {\n  const lock = LockService.getScriptLock();\n  if (!lock.tryLock(10000)) {\n    return createJsonResponse({ success: false, retryable: true, error: \"Server busy. Please retry shortly.\" });\n  }\n  try {\n    const rawContent = e.postData ? e.postData.contents : null;\n    if (!rawContent) {\n      throw new Error(\"Missing POST request body.\");\n    }\n\n    const payload = JSON.parse(rawContent);\n\n    // Optional server-side secret validation:\n    // If you set a Script Property named \"DRIVING_LOG_SECRET\" in Apps Script Project Settings,\n    // only submissions with a matching secret will be accepted.\n    const expectedSecret = PropertiesService.getScriptProperties().getProperty(\"DRIVING_LOG_SECRET\");\n    if (expectedSecret && payload.secret !== expectedSecret) {\n      return createJsonResponse({\n        success: false,\n        error: \"Unauthorized: Invalid or missing secret key.\"\n      });\n    }\n\n    // Support update action from the mobile transaction editor\n    if (payload.action === \"update\") {\n      const ss = SpreadsheetApp.getActiveSpreadsheet();\n      let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];\n      const data = sheet.getDataRange().getValues();\n\n      if (data.length \u003c= 1) {\n        return createJsonResponse({\n          success: false,\n          status: \"error\",\n          message: \"No data rows found in sheet to update.\"\n        });\n      }\n\n      const headers = data[0].map(h => String(h || \"\").trim().toLowerCase());\n      let idIdx = headers.findIndex(h => h.includes(\"trip id\") || h === \"id\");\n      let dateIdx = headers.findIndex(h => h === \"date\" || h.includes(\"trip date\"));\n      let notesIdx = headers.findIndex(h => h.includes(\"note\") || h.includes(\"purpose\"));\n      let routeIdx = headers.findIndex(h => h.includes(\"route\") || (h.includes(\"stop\") && !h.includes(\"count\")));\n      let stopsCountIdx = headers.findIndex(h => h === \"stops\" || h.includes(\"count\"));\n      let kmIdx = headers.findIndex(h => h.includes(\"km\") || h.includes(\"distance\") || h.includes(\"mileage\"));\n\n      if (idIdx === -1) idIdx = 0;\n      if (dateIdx === -1) dateIdx = 1;\n      if (notesIdx === -1) notesIdx = 2;\n      if (routeIdx === -1) routeIdx = 3;\n      if (stopsCountIdx === -1) stopsCountIdx = 4;\n      if (kmIdx === -1) kmIdx = 5;\n\n      const targetId = String(payload.id || \"\").trim();\n      let targetRowIndex = -1;\n\n      for (let i = 1; i \u003c data.length; i++) {\n        const rowId = String(data[i][idIdx] || \"\").trim();\n        if (rowId === targetId || targetId === (\"ROW-\" + i)) {\n          targetRowIndex = i + 1; // 1-based index for getRange\n          break;\n        }\n      }\n\n      if (targetRowIndex === -1) {\n        return createJsonResponse({\n          success: false,\n          status: \"error\",\n          message: \"Trip ID not found in sheet: \" + targetId\n        });\n      }\n\n      if (payload.date !== undefined) sheet.getRange(targetRowIndex, dateIdx + 1).setValue(payload.date);\n      if (payload.notes !== undefined) sheet.getRange(targetRowIndex, notesIdx + 1).setValue(payload.notes);\n      if (payload.route !== undefined) sheet.getRange(targetRowIndex, routeIdx + 1).setValue(cleanRouteString(payload.route));\n      if (payload.stops !== undefined) sheet.getRange(targetRowIndex, stopsCountIdx + 1).setValue(payload.stops);\n      if (payload.totalKm !== undefined) sheet.getRange(targetRowIndex, kmIdx + 1).setValue(Math.round(parseFloat(payload.totalKm) * 10) / 10);\n\n      return createJsonResponse({\n        success: true,\n        status: \"success\",\n        message: \"Trip updated successfully\",\n        id: targetId\n      });\n    }\n\n    const stops = payload.stops;\n\n    if (!stops || !Array.isArray(stops) || stops.length \u003c 2) {\n      throw new Error(\"A valid drive requires at least 2 distinct stops (Start and Destination).\");\n    }\n\n    const notes = payload.notes || \"Trip\";\n    const chosenDate = payload.date || new Date().toISOString().slice(0, 10);\n    // Keep one ID across retries, including requests queued by older app versions.\n    const requestId = String(payload.requestId || payload.timestamp || Utilities.getUuid());\n    const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,\n      JSON.stringify([requestId, stops, chosenDate, notes, payload.routeSummary || \"\"]));\n    const tripId = \"TRIP-\" + chosenDate.replace(/-/g, \"\") + \"-\" +\n      digest.map(b => (b & 255).toString(16).padStart(2, \"0\")).join(\"\");\n    const ss = SpreadsheetApp.getActiveSpreadsheet();\n    const sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];\n    const data = sheet.getDataRange().getValues();\n    const existing = data.slice(1).find(row => String(row[0]) === tripId);\n    if (existing) {\n      return createJsonResponse({ success: true, tripId: tripId, totalKm: Number(existing[5]),\n        date: chosenDate, route: existing[3], stops: existing[3], duplicate: true });\n    }\n\n    // Use human-readable route summary with clean names starting with first destination\n    const routeSummary = cleanRouteString(payload.routeSummary || buildRouteSummaryFromStops(stops));\n    const stopsCount = stops.length;\n\n    // Calculate driving distance using Google Maps Directions API\n    let totalMeters = 0;\n    for (let i = 0; i \u003c stops.length - 1; i++) {\n      const origin = stops[i];\n      const destination = stops[i + 1];\n\n      const directions = Maps.newDirectionFinder()\n        .setOrigin(origin)\n        .setDestination(destination)\n        .setMode(Maps.DirectionFinder.Mode.DRIVING)\n        .getDirections();\n\n      if (directions.status === \"OK\" && directions.routes && directions.routes.length > 0 &&\n          directions.routes[0].legs && directions.routes[0].legs.length > 0) {\n        const route = directions.routes[0];\n        for (let j = 0; j \u003c route.legs.length; j++) {\n          const meters = Number(route.legs[j].distance && route.legs[j].distance.value);\n          if (!Number.isFinite(meters) || meters \u003c 0) {\n            throw new Error(\"Invalid distance for route leg \" + (i + 1) + \". No trip was saved.\");\n          }\n          totalMeters += meters;\n        }\n      } else {\n        throw new Error(\"Could not calculate route leg \" + (i + 1) + \" (\" +\n          (directions.status || \"invalid response\") + \"). Check the stop addresses. No trip was saved.\");\n      }\n    }\n\n    const totalKm = Number((totalMeters / 1000).toFixed(1));\n    if (totalKm \u003c= 0) throw new Error(\"The route returned 0 km. Check the stop addresses. No trip was saved.\");\n\n    // Append matching your exact sheet columns:\n    // A: Trip ID | B: Date | C: Notes | D: Route | E: Stops | F: Total KM\n    sheet.appendRow([tripId, chosenDate, notes, routeSummary, stopsCount, totalKm]);\n\n    return createJsonResponse({\n      success: true,\n      tripId: tripId,\n      totalKm: totalKm,\n      date: chosenDate,\n      route: routeSummary,\n      stops: routeSummary\n    });\n\n  } catch (err) {\n    return createJsonResponse({\n      success: false,\n      error: err.toString()\n    });\n  } finally {\n    try {\n      SpreadsheetApp.flush();\n    } finally {\n      lock.releaseLock();\n    }\n  }\n}\n\n/**\n * Checks if a segment represents the home address\n */\nfunction isHomeSegment(segment) {\n  if (!segment) return false;\n  const s = String(segment).toLowerCase().trim();\n  return (\n    s.includes(\"dalmatian\") ||\n    s.includes(\"m1c 4w7\") ||\n    s.includes(\"m1c4w7\") ||\n    s === \"home\" ||\n    s.startsWith(\"home \") ||\n    s.startsWith(\"home,\") ||\n    s.startsWith(\"home -\") ||\n    s.startsWith(\"home —\") ||\n    (s.includes(\"scarborough\") && !s.includes(\"military\") && !s.includes(\"sewells\") && !s.includes(\"tabor\"))\n  );\n}\n\n/**\n * Resolves an address or text to its friendly destination name (e.g. \"CEC Board Office\")\n */\nfunction resolveFriendlyName(segment) {\n  if (!segment) return \"\";\n  const trimmed = String(segment).trim();\n\n  // 1. Check known locations map\n  for (let i = 0; i \u003c KNOWN_LOCATIONS.length; i++) {\n    const loc = KNOWN_LOCATIONS[i];\n    for (let j = 0; j \u003c loc.patterns.length; j++) {\n      if (trimmed.toLowerCase().includes(loc.patterns[j].toLowerCase())) {\n        return loc.name;\n      }\n    }\n  }\n\n  // 2. Clean address: remove postal codes, province, country\n  let clean = trimmed.split(\",\")[0].trim();\n  clean = clean.replace(/,.*$/, \"\");\n  clean = clean.replace(/\\b(ON|Ontario|Canada|M\\d[A-Z]\\s*\\d[A-Z]\\d)\\b/gi, \"\").trim();\n\n  return clean || trimmed;\n}\n\n/**\n * Robust route parser:\n * 1. Splits route into waypoints.\n * 2. Omits the redundant home address from the start so the route starts with the first trip of the day!\n * 3. Resolves raw street addresses (like \"80 Sheppard Ave E...\") into friendly school names (\"CEC Board Office\").\n * 4. Ends cleanly with \"Home\" if it was a roundtrip.\n */\nfunction cleanRouteString(rawRoute) {\n  if (!rawRoute) return \"Trip\";\n\n  const rawSegments = String(rawRoute)\n    .split(/\\s*[-—→>]+\\s*|\\s+to\\s+/i)\n    .map(s => s.trim())\n    .filter(Boolean);\n\n  if (rawSegments.length === 0) return \"Trip\";\n\n  const destinationSegments = [];\n\n  for (let i = 0; i \u003c rawSegments.length; i++) {\n    const seg = rawSegments[i];\n    const isFirst = (i === 0);\n    const isLast = (i === rawSegments.length - 1);\n\n    if (isHomeSegment(seg)) {\n      if (isLast && destinationSegments.length > 0) {\n        destinationSegments.push(\"Home\");\n      }\n      // If it's a leading home address or intermediate home, omit it!\n      continue;\n    }\n\n    destinationSegments.push(resolveFriendlyName(seg));\n  }\n\n  if (destinationSegments.length === 0) {\n    return \"Home Circuit\";\n  }\n\n  return destinationSegments.join(\" → \");\n}\n\n/**\n * Builds clean route summary from stop addresses\n */\nfunction buildRouteSummaryFromStops(stops) {\n  if (!stops || stops.length === 0) return \"Trip\";\n  return cleanRouteString(stops.join(\" → \"));\n}\n\n/**\n * ONE-CLICK UTILITY TO CLEAN EXISTING GOOGLE SHEET ROWS:\n * Select \"cleanExistingRoutesInSheet\" in Apps Script and click \"Run\".\n * It will update Column D in all past rows in your Google Sheet to the clean format!\n */\nfunction cleanExistingRoutesInSheet() {\n  const ss = SpreadsheetApp.getActiveSpreadsheet();\n  const sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];\n  const data = sheet.getDataRange().getValues();\n  if (data.length \u003c= 1) return;\n\n  const headers = data[0].map(h => String(h || \"\").trim().toLowerCase());\n  let routeIdx = headers.findIndex(h => h.includes(\"route\") || (h.includes(\"stop\") && !h.includes(\"count\")));\n  if (routeIdx === -1) routeIdx = 3; // Column D\n\n  let updatedCount = 0;\n  for (let i = 1; i \u003c data.length; i++) {\n    const rawRoute = String(data[i][routeIdx] || \"\");\n    if (!rawRoute) continue;\n\n    const cleaned = cleanRouteString(rawRoute);\n    if (cleaned !== rawRoute) {\n      sheet.getRange(i + 1, routeIdx + 1).setValue(cleaned);\n      updatedCount++;\n    }\n  }\n\n  Logger.log(\"Successfully cleaned \" + updatedCount + \" existing routes in Column D.\");\n}\n\n/**\n * Helper to build JSON output with CORS headers\n */\nfunction createJsonResponse(data) {\n  return ContentService.createTextOutput(JSON.stringify(data))\n    .setMimeType(ContentService.MimeType.JSON);\n}\n";
+    const APPS_SCRIPT_SOURCE = "/** Driving Log — bound to your existing Google spreadsheet.\n * Headers: Trip ID | Date | Notes | Route | Stops | Total KM\n * Accepts the current app's calculated/manual mileage and older address-only requests.\n */\nconst SHEET_NAME = \"Trips\";\nconst TIME_ZONE = \"America/Toronto\";\n\nconst KNOWN_LOCATIONS = [\n  [\"CEC Board Office\", [\"80 Sheppard\", \"CEC Board\"]],\n  [\"Chaminade College\", [\"490 Queen\", \"Chaminade\"]],\n  [\"St. John Paul II\", [\"685 Military\", \"John Paul\"]],\n  [\"St. Columba\", [\"1054 Military\", \"Columba\"]],\n  [\"St. Mother Teresa\", [\"440 Sewell\", \"Mother Teresa\"]],\n  [\"Madonna CSS\", [\"20 Cresswell\", \"Madonna\"]],\n  [\"St. Basil-the-Great\", [\"20 Weston\", \"Basil-the-Great\"]],\n  [\"Maria Goretti\", [\"21 Tabor\", \"Goretti\"]],\n  [\"St. Agatha\", [\"Agatha\"]],\n  [\"St. Nicholas\", [\"Nicholas\"]],\n  [\"St. Barnabas\", [\"St Barnabas\", \"St. Barnabas\"]],\n  [\"Notre Dame CSS (Ajax)\", [\"1375 Harwood\"]],\n  [\"Notre Dame HS (Toronto)\", [\"12 Malvern\"]],\n  [\"Notre Dame CSS (Brampton)\", [\"2 Notre Dame\"]],\n  [\"St. Mary CSS (Pickering)\", [\"1918 Whites\"]],\n  [\"St. Mary Academy (Toronto)\", [\"66 Dufferin Park\"]],\n  [\"St. Joan of Arc (Scarborough)\", [\"959 Midland\"]],\n  [\"St. Joan of Arc (Mississauga)\", [\"3801 Thomas\"]],\n  [\"St. Joseph's College (Toronto)\", [\"74 Wellesley\"]],\n  [\"St. Joseph Secondary (Mississauga)\", [\"5555 Creditview\"]],\n  [\"St. Francis Xavier (Mississauga)\", [\"50 Bristol\"]],\n  [\"Pine Ridge SS\", [\"2155 Liverpool\", \"Pine Ridge\"]],\n  [\"Pickering HS\", [\"180 Church\", \"Pickering High\"]],\n  [\"Milliken Mills HS\", [\"7522 Kennedy\", \"Milliken Mills\"]],\n  [\"Downtown Office\", [\"100 Queen\", \"City Hall\"]]\n];\n\nfunction doGet() {\n  try {\n    const context = readSheet();\n    const trips = [];\n    let totalKm = 0;\n    for (let r = context.data.length - 1; r >= 1; r--) {\n      const row = context.data[r];\n      if (!row.some(value => value !== \"\" && value !== null)) continue;\n      const trip = tripFromRow(row, context.columns, \"ROW-\" + r);\n      trips.push(trip);\n      totalKm += trip.totalKm;\n    }\n    return createJsonResponse({ success: true, status: \"success\",\n      sheetUrl: context.ss.getUrl(), totalKm: roundKm(totalKm), count: trips.length, trips: trips });\n  } catch (error) {\n    return errorResponse(error);\n  }\n}\n\nfunction doPost(e) {\n  const lock = LockService.getScriptLock();\n  let locked = false;\n  try {\n    if (!e || !e.postData || !e.postData.contents) throw new Error(\"Missing request body.\");\n    const payload = JSON.parse(e.postData.contents);\n    if (!payload || typeof payload !== \"object\" || Array.isArray(payload)) throw new Error(\"Invalid request body.\");\n\n    // Preserve your existing optional server-side key check for every write.\n    const secret = PropertiesService.getScriptProperties().getProperty(\"DRIVING_LOG_SECRET\");\n    if (secret && payload.secret !== secret) throw new Error(\"Unauthorized: invalid or missing secret key.\");\n\n    locked = lock.tryLock(10000);\n    if (!locked) return createJsonResponse({ success: false, status: \"error\", retryable: true,\n      error: \"Server busy. Retry this pending trip shortly.\", message: \"Server busy. Retry this pending trip shortly.\" });\n\n    const context = readSheet();\n    let result;\n    if (payload.action === \"update\") result = updateTrip(context, payload);\n    else if (!payload.action || payload.action === \"create\") result = createTrip(context, payload);\n    else throw new Error(\"Unsupported action.\");\n\n    // Commit spreadsheet changes before releasing exclusive access or confirming success.\n    SpreadsheetApp.flush();\n    return createJsonResponse(result);\n  } catch (error) {\n    return errorResponse(error);\n  } finally {\n    if (locked) lock.releaseLock();\n  }\n}\n\nfunction createTrip(context, payload) {\n  const stops = payload.stops;\n  if (!Array.isArray(stops) || stops.length \u003c 2 ||\n      stops.some(stop => typeof stop !== \"string\" || !stop.trim())) {\n    throw new Error(\"At least two valid stop addresses are required.\");\n  }\n  const date = validateDate(payload.date || Utilities.formatDate(new Date(), TIME_ZONE, \"yyyy-MM-dd\"));\n  const notes = String(payload.notes || payload.purpose || \"Trip\");\n  const suppliedId = String(payload.id || payload.tripId || \"\").trim();\n  if (suppliedId && !/^[A-Za-z0-9_-]{1,180}$/.test(suppliedId)) throw new Error(\"Invalid trip ID.\");\n\n  // Prefer the app's stable ID. Also recognize IDs generated by the previous backend.\n  const requestKey = String(payload.requestId || payload.timestamp || suppliedId);\n  if (!requestKey) throw new Error(\"Missing submission ID. Refresh the app before recording this trip.\");\n  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,\n    JSON.stringify([requestKey, stops, date, notes, payload.routeSummary || \"\"]));\n  const legacyId = \"TRIP-\" + date.replace(/-/g, \"\") + \"-\" +\n    digest.map(byte => (byte & 255).toString(16).padStart(2, \"0\")).join(\"\");\n  const id = suppliedId || legacyId;\n  const c = context.columns;\n  const existing = context.data.slice(1).find(row =>\n    String(row[c.id]) === id || String(row[c.id]) === legacyId);\n  if (existing) return successResponse(\"existing\", tripFromRow(existing, c), true);\n\n  // A supplied distance must be valid; never silently replace invalid input with zero.\n  let suppliedKm;\n  if (payload.totalKm !== undefined) suppliedKm = payload.totalKm;\n  else if (payload.distanceKm !== undefined) suppliedKm = payload.distanceKm;\n  else if (payload.km !== undefined) suppliedKm = payload.km;\n  const km = suppliedKm !== undefined ? validateKm(suppliedKm) : calculateDistance(stops);\n  const route = cleanRouteString(payload.routeSummary || payload.route || stops.join(\" → \"));\n  const row = new Array(context.data[0].length).fill(\"\");\n  row[c.id] = id;\n  row[c.date] = date;\n  row[c.notes] = sheetText(notes);\n  row[c.route] = sheetText(route);\n  row[c.stops] = stops.length;\n  row[c.km] = km;\n  context.sheet.appendRow(row);\n  return successResponse(\"created\", { id: id, tripId: id, date: date, notes: notes,\n    route: route, rawRoute: route, stops: stops.length, stopsCount: stops.length,\n    totalKm: km, km: km, synced: true }, false);\n}\n\nfunction updateTrip(context, payload) {\n  const id = String(payload.id || payload.tripId || \"\").trim();\n  if (!id) throw new Error(\"Missing trip ID for update.\");\n  const c = context.columns;\n  // Match an actual ID first. A ROW-n fallback applies only to rows without an ID.\n  let index = context.data.findIndex((row, r) => r > 0 && String(row[c.id]) === id);\n  if (index \u003c 0) index = context.data.findIndex((row, r) =>\n    r > 0 && !row[c.id] && id === \"ROW-\" + r);\n  if (index \u003c 0) throw new Error(\"Trip not found. No rows were changed.\");\n\n  const row = context.data[index].slice();\n  const changes = {};\n  if (payload.date !== undefined) changes[c.date] = validateDate(payload.date);\n  if (payload.notes !== undefined) changes[c.notes] = sheetText(payload.notes);\n  if (payload.route !== undefined) {\n    if (!String(payload.route).trim()) throw new Error(\"Route cannot be empty.\");\n    changes[c.route] = sheetText(cleanRouteString(payload.route));\n  }\n  if (payload.totalKm !== undefined) changes[c.km] = validateKm(payload.totalKm);\n  if (payload.stops !== undefined) {\n    const count = Number(payload.stops);\n    if (!Number.isInteger(count) || count \u003c 1) throw new Error(\"Stops must be a positive whole number.\");\n    changes[c.stops] = count;\n  }\n  // Keep all validation ahead of the write, preserving unrelated formulas.\n  const range = context.sheet.getRange(index + 1, 1, 1, row.length);\n  const formulas = range.getFormulas()[0];\n  const values = row.map((value, column) => formulas[column] || value);\n  Object.keys(changes).forEach(column => { values[column] = changes[column]; row[column] = changes[column]; });\n  range.setValues([values]);\n  return successResponse(\"updated\", tripFromRow(row, c, id), false);\n}\n\nfunction calculateDistance(stops) {\n  let meters = 0;\n  for (let i = 0; i \u003c stops.length - 1; i++) {\n    const directions = Maps.newDirectionFinder().setOrigin(stops[i]).setDestination(stops[i + 1])\n      .setMode(Maps.DirectionFinder.Mode.DRIVING).getDirections();\n    const legs = directions && directions.routes && directions.routes[0] && directions.routes[0].legs;\n    if (!directions || directions.status !== \"OK\" || !legs || !legs.length) {\n      throw new Error(\"Cannot calculate route leg \" + (i + 1) + \". Check the addresses. No trip was saved.\");\n    }\n    legs.forEach(leg => {\n      const value = leg.distance && leg.distance.value;\n      if (typeof value !== \"number\" || !Number.isFinite(value) || value \u003c 0) {\n        throw new Error(\"Invalid route distance. No trip was saved.\");\n      }\n      meters += value;\n    });\n  }\n  return validateKm(meters / 1000);\n}\n\nfunction readSheet() {\n  const ss = SpreadsheetApp.getActiveSpreadsheet();\n  if (!ss) throw new Error(\"Open Apps Script from your Trip Log spreadsheet using Extensions > Apps Script.\");\n  const sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];\n  const data = sheet.getDataRange().getValues();\n  const headers = data[0].map(value => String(value).trim().toLowerCase());\n  const columns = {\n    id: headers.findIndex(h => h === \"trip id\" || h === \"id\"),\n    date: headers.findIndex(h => h === \"date\" || h === \"trip date\"),\n    notes: headers.findIndex(h => h === \"notes\" || h === \"purpose\" || h === \"note\"),\n    route: headers.findIndex(h => h === \"route\" || h === \"route summary\"),\n    stops: headers.findIndex(h => h === \"stops\" || h === \"stop count\" || h === \"stops count\"),\n    km: headers.findIndex(h => h === \"total km\" || h === \"km\" || h === \"distance km\")\n  };\n  if (Object.keys(columns).some(key => columns[key] \u003c 0)) {\n    throw new Error(\"Row 1 must contain: Trip ID, Date, Notes, Route, Stops, Total KM.\");\n  }\n  return { ss: ss, sheet: sheet, data: data, columns: columns };\n}\n\nfunction tripFromRow(row, c, fallbackId) {\n  const id = String(row[c.id] || fallbackId || \"\");\n  const date = row[c.date] instanceof Date\n    ? Utilities.formatDate(row[c.date], TIME_ZONE, \"yyyy-MM-dd\") : String(row[c.date] || \"\").slice(0, 10);\n  const km = Number(row[c.km]);\n  const totalKm = Number.isFinite(km) ? roundKm(km) : 0;\n  const stops = Number(row[c.stops]) || 0;\n  return { id: id, tripId: id, date: date, notes: String(row[c.notes] || \"\"),\n    route: cleanRouteString(row[c.route]), rawRoute: String(row[c.route] || \"\"),\n    stops: stops, stopsCount: stops, stopCount: stops, totalKm: totalKm, km: totalKm, synced: true };\n}\n\nfunction successResponse(action, trip, duplicate) {\n  return { success: true, status: \"success\", action: action, duplicate: duplicate,\n    id: trip.id, tripId: trip.tripId, totalKm: trip.totalKm, km: trip.totalKm,\n    date: trip.date, route: trip.route, stops: trip.stops, notes: trip.notes, trip: trip };\n}\n\nfunction validateKm(value) {\n  if (typeof value !== \"number\" && typeof value !== \"string\") throw new Error(\"Distance must be a number greater than 0 km.\");\n  const number = Number(value);\n  if (!Number.isFinite(number) || !Number.isFinite(roundKm(number)) || number \u003c= 0 || roundKm(number) \u003c= 0) {\n    throw new Error(\"Distance must be a finite number greater than 0 km. No trip was saved.\");\n  }\n  return roundKm(number);\n}\n\nfunction roundKm(value) { return Math.round(value * 10) / 10; }\n\nfunction validateDate(value) {\n  const date = String(value).trim();\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error(\"Date must use YYYY-MM-DD.\");\n  const parsed = new Date(date + \"T12:00:00Z\");\n  if (isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new Error(\"Invalid trip date.\");\n  return date;\n}\n\nfunction sheetText(value) {\n  const text = String(value == null ? \"\" : value);\n  return /^\\s*[=+@-]/.test(text) ? \"'\" + text : text;\n}\n\nfunction cleanRouteString(value) {\n  const text = String(value || \"\").trim();\n  if (!text) return \"Trip\";\n  // Split separators, preserving hyphens inside school and street names.\n  const segments = text.split(/\\s*(?:→|->|\\||>)\\s*|\\s+[–—-]\\s+|\\s+to\\s+/i).filter(Boolean);\n  const result = [];\n  segments.forEach((segment, index) => {\n    const cleaned = segment.trim();\n    if (/^home(?:\\b|$)/i.test(cleaned) || /\\bdalmatian\\b/i.test(cleaned)) {\n      if (index === segments.length - 1 && result.length) result.push(\"Home\");\n      return;\n    }\n    const match = KNOWN_LOCATIONS.find(location =>\n      location[1].some(pattern => cleaned.toLowerCase().includes(pattern.toLowerCase())));\n    result.push(match ? match[0] : cleaned.split(\",\")[0].trim());\n  });\n  return result.length ? result.join(\" → \") : \"Home Circuit\";\n}\n\nfunction errorResponse(error) {\n  const message = error && error.message ? error.message : String(error);\n  return createJsonResponse({ success: false, status: \"error\", error: message, message: message });\n}\n\nfunction createJsonResponse(data) {\n  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);\n}\n";
 
     function populateAppsScriptCodeBlock() {
       const textarea = document.getElementById("appsScriptCodeBlock");
