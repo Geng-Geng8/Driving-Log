@@ -149,6 +149,10 @@ function doGet(e) {
  * Handle POST requests: Calculate mileage and log a new trip to the sheet
  */
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return createJsonResponse({ success: false, retryable: true, error: "Server busy. Please retry shortly." });
+  }
   try {
     const rawContent = e.postData ? e.postData.contents : null;
     if (!rawContent) {
@@ -238,41 +242,61 @@ function doPost(e) {
 
     const notes = payload.notes || "Trip";
     const chosenDate = payload.date || new Date().toISOString().slice(0, 10);
-    const timestamp = payload.timestamp || new Date().toISOString();
+    // Keep one ID across retries, including requests queued by older app versions.
+    const requestId = String(payload.requestId || payload.timestamp || Utilities.getUuid());
+    const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+      JSON.stringify([requestId, stops, chosenDate, notes, payload.routeSummary || ""]));
+    const tripId = "TRIP-" + chosenDate.replace(/-/g, "") + "-" +
+      digest.map(b => (b & 255).toString(16).padStart(2, "0")).join("");
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+    const data = sheet.getDataRange().getValues();
+    const existing = data.slice(1).find(row => String(row[0]) === tripId);
+    if (existing) {
+      return createJsonResponse({ success: true, tripId: tripId, totalKm: Number(existing[5]),
+        date: chosenDate, route: existing[3], stops: existing[3], duplicate: true });
+    }
 
     // Use human-readable route summary with clean names starting with first destination
     const routeSummary = cleanRouteString(payload.routeSummary || buildRouteSummaryFromStops(stops));
     const stopsCount = stops.length;
 
-    // Calculate driving distance using Google Maps Directions API
-    let totalMeters = 0;
-    for (let i = 0; i < stops.length - 1; i++) {
-      const origin = stops[i];
-      const destination = stops[i + 1];
+    // Determine driving distance: use verified client/manual distance or calculate via Google Maps Directions API
+    let totalKm = (payload.totalKm && !isNaN(Number(payload.totalKm)) && Number(payload.totalKm) > 0)
+      ? Number(Number(payload.totalKm).toFixed(1))
+      : 0;
 
-      const directions = Maps.newDirectionFinder()
-        .setOrigin(origin)
-        .setDestination(destination)
-        .setMode(Maps.DirectionFinder.Mode.DRIVING)
-        .getDirections();
+    if (totalKm <= 0) {
+      let totalMeters = 0;
+      for (let i = 0; i < stops.length - 1; i++) {
+        const origin = stops[i];
+        const destination = stops[i + 1];
 
-      if (directions.status === "OK" && directions.routes.length > 0) {
-        const route = directions.routes[0];
-        for (let j = 0; j < route.legs.length; j++) {
-          totalMeters += route.legs[j].distance.value;
+        const directions = Maps.newDirectionFinder()
+          .setOrigin(origin)
+          .setDestination(destination)
+          .setMode(Maps.DirectionFinder.Mode.DRIVING)
+          .getDirections();
+
+        if (directions.status === "OK" && directions.routes && directions.routes.length > 0 &&
+            directions.routes[0].legs && directions.routes[0].legs.length > 0) {
+          const route = directions.routes[0];
+          for (let j = 0; j < route.legs.length; j++) {
+            const meters = Number(route.legs[j].distance && route.legs[j].distance.value);
+            if (!Number.isFinite(meters) || meters < 0) {
+              throw new Error("Invalid distance for route leg " + (i + 1) + ". No trip was saved.");
+            }
+            totalMeters += meters;
+          }
+        } else {
+          throw new Error("Could not calculate route leg " + (i + 1) + " (" +
+            (directions.status || "invalid response") + "). Check the stop addresses. No trip was saved.");
         }
-      } else {
-        console.warn("Could not route between: " + origin + " and " + destination);
       }
+      totalKm = Number((totalMeters / 1000).toFixed(1));
     }
 
-    const totalKm = Number((totalMeters / 1000).toFixed(1));
-    const randomSuffix = Math.random().toString(36).substr(2, 4).toUpperCase();
-    const tripDatePart = chosenDate.replace(/-/g, "");
-    const tripId = `TRIP-${tripDatePart}-${randomSuffix}`;
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+    if (totalKm <= 0) throw new Error("The route returned 0 km. Check the stop addresses. No trip was saved.");
 
     // Append matching your exact sheet columns:
     // A: Trip ID | B: Date | C: Notes | D: Route | E: Stops | F: Total KM
@@ -292,6 +316,12 @@ function doPost(e) {
       success: false,
       error: err.toString()
     });
+  } finally {
+    try {
+      SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
   }
 }
 
