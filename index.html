@@ -443,7 +443,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="offlineQueueBadge" onclick="processPendingQueue()" class="hidden min-h-[40px] text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all" title="Click to sync pending trips now">
+        <button type="button" id="offlineQueueBadge" onclick="handlePendingClick()" class="hidden min-h-[40px] text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all" title="Queue stuck? Click to flush or clear pending cache." aria-label="Flush pending trips or review clearing pending cache">
           <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
           <span id="queueCount">0</span> Pending
         </button>
@@ -1097,7 +1097,7 @@
       loadLocalSchools();
 
       // Mirror fresh Google Sheet data silently in the background
-      syncWithGoogleSheet(false);
+      syncWithGoogleSheet(false).then(() => processPendingQueue());
 
       window.addEventListener("online", () => {
         updateConnectionStatus(true);
@@ -1105,6 +1105,9 @@
         syncWithGoogleSheet(false);
       });
       window.addEventListener("offline", () => updateConnectionStatus(false));
+      window.addEventListener("storage", event => {
+        if (event.key === "pending_trips_queue" || event.key === "driving_log_queue") updateOfflineQueueBadge();
+      });
     });
 
     // -------------------------------------------------------------
@@ -1817,7 +1820,37 @@
     // -------------------------------------------------------------
     // LIVE GOOGLE SHEET 2-WAY SYNCHRONIZATION
     // -------------------------------------------------------------
+    // Bound both the network request and response-body read so controls can recover.
+    async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 15000) {
+      const controller = new AbortController();
+      let timeout;
+      try {
+        return await Promise.race([
+          (async () => {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+          })(),
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => {
+              controller.abort();
+              reject(new Error("Request timed out. Check your connection and retry."));
+            }, timeoutMs);
+          })
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function isSaveConfirmed(data) {
+      return data && data.success !== false && data.status !== "error" &&
+        (data.success === true || data.status === "success");
+    }
+
+    let sheetSyncGeneration = 0;
     async function syncWithGoogleSheet(showFeedback = false) {
+      const generation = ++sheetSyncGeneration;
       const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
       const statusEl = document.getElementById("connectionStatus");
       const spinIcon = document.getElementById("syncSpinIcon");
@@ -1826,7 +1859,7 @@
       if (!navigator.onLine) {
         updateConnectionStatus(false);
         if (showFeedback) showAlert("You are offline. Showing cached drives.", "warning");
-        return;
+        return false;
       }
 
       if (spinIcon) spinIcon.classList.add("animate-spin");
@@ -1835,20 +1868,19 @@
       }
 
       try {
-        const res = await fetch(scriptUrl, {
+        // A unique URL also bypasses cached redirects and intermediary responses.
+        const freshUrl = new URL(scriptUrl);
+        freshUrl.searchParams.set("_refresh", Date.now() + "-" + generation);
+        const data = await fetchJsonWithTimeout(freshUrl.toString(), {
           method: "GET",
           headers: { "Accept": "application/json" },
           cache: "no-store",
-          priority: "low"
+          priority: showFeedback ? "high" : "low"
         });
+        // A slower, older request must not replace a newer sheet refresh.
+        if (generation !== sheetSyncGeneration) return false;
 
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        if (data.status === "success" && Array.isArray(data.trips)) {
+        if (isSaveConfirmed(data) && Array.isArray(data.trips)) {
           // Zero-drift sync: save scroll position before updating
           const prevScrollY = window.scrollY || document.documentElement.scrollTop;
 
@@ -1856,6 +1888,7 @@
           localStorage.setItem("cached_trips_data", JSON.stringify(data.trips));
           localStorage.setItem("driving_log_history", JSON.stringify(data.trips));
           localStorage.setItem("driving_log_recent_trips", JSON.stringify(data.trips));
+          reconcilePendingTrips(data.trips);
           if (data.sheetUrl && typeof data.sheetUrl === "string") {
             localStorage.setItem("driving_log_sheet_url", data.sheetUrl);
             const sheetInput = document.getElementById("configSheetUrlInput");
@@ -1872,21 +1905,24 @@
           window.scrollTo({ top: prevScrollY, behavior: "instant" });
 
           if (showFeedback) showAlert(`✓ Synced ${data.trips.length} drives from Google Sheet!`, "success");
+          return true;
         } else if (data.status === "healthy" && !data.trips) {
           // Running write-only template without doGet implementation
           updateConnectionStatus(true, "Sheet Connected");
           if (syncBanner) syncBanner.classList.remove("hidden");
           if (showFeedback) showAlert("Sheet connected! Update Apps Script Code.gs to mirror past drives on mobile.", "warning");
         } else {
-          updateConnectionStatus(true, "Sheets Live");
+          throw new Error(data.error || data.message || "Apps Script did not return a trip list. Update its deployed Code.gs.");
         }
       } catch (err) {
+        if (generation !== sheetSyncGeneration) return false;
         console.warn("Sheet sync error:", err);
         updateConnectionStatus(navigator.onLine, navigator.onLine ? "Sync Dropped" : "Offline Mode");
-        if (showFeedback) showAlert("Unable to sync from Google Sheet. Check network or script URL.", "warning");
+        if (showFeedback) showAlert("Unable to refresh from Google Sheet. " + err.message, "warning");
       } finally {
-        if (spinIcon) spinIcon.classList.remove("animate-spin");
+        if (spinIcon && generation === sheetSyncGeneration) spinIcon.classList.remove("animate-spin");
       }
+      return false;
     }
 
     // -------------------------------------------------------------
@@ -2052,15 +2088,11 @@
       const queryAddr = clean.replace(/, Canada$/i, "").trim();
 
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3500);
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(queryAddr)}&lat=43.6532&lon=-79.3832&limit=1`;
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.features && data.features.length > 0) {
-            const coords = data.features[0].geometry.coordinates; // [lon, lat]
+        const data = await fetchJsonWithTimeout(url, {}, 5000);
+        if (data.features && data.features.length > 0) {
+          const coords = data.features[0].geometry && data.features[0].geometry.coordinates;
+          if (validCoordinates(coords)) {
             GEOCODE_CACHE[clean] = coords;
             return coords;
           }
@@ -2071,6 +2103,19 @@
       return null;
     }
 
+    function validCoordinates(coords) {
+      return Array.isArray(coords) && coords.length >= 2 &&
+        Number.isFinite(coords[0]) && Number.isFinite(coords[1]) &&
+        Math.abs(coords[0]) <= 180 && Math.abs(coords[1]) <= 90;
+    }
+
+    function positiveRoundedKm(value) {
+      if (typeof value !== "number" && typeof value !== "string") return null;
+      const number = Number(value);
+      const rounded = Math.round(number * 10) / 10;
+      return Number.isFinite(number) && Number.isFinite(rounded) && rounded > 0 ? rounded : null;
+    }
+
     async function calculateRouteKm(addresses) {
       if (!addresses || addresses.length < 2) return null;
 
@@ -2079,25 +2124,15 @@
         const coordsList = await Promise.all(addresses.map(a => geocodeAddress(a)));
 
         // If any point could not be geocoded, cannot build full driving path
-        if (coordsList.some(c => !c || !Array.isArray(c) || c.length < 2)) {
+        if (coordsList.some(c => !validCoordinates(c))) {
           return null;
         }
 
         const coordString = coordsList.map(c => `${c[0]},${c[1]}`).join(";");
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=false`;
-        const res = await fetch(osrmUrl, { signal: controller.signal });
-        clearTimeout(timeout);
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.code === "Ok" && data.routes && data.routes.length > 0) {
-            const meters = data.routes[0].distance;
-            if (!isNaN(meters) && meters > 0) {
-              return Number((meters / 1000).toFixed(1));
-            }
-          }
+        const data = await fetchJsonWithTimeout(osrmUrl, {}, 8000);
+        if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+          return positiveRoundedKm(data.routes[0].distance / 1000);
         }
       } catch (err) {
         console.warn("Route distance calculation notice:", err.message);
@@ -2149,21 +2184,18 @@
         const routeSummary = buildRouteSummary();
 
         // Ensure the route calculation and any geocoding promises are completely resolved before saving
-        let distanceKm = await calculateRouteKm(routeAddresses);
+        let distanceKm = positiveRoundedKm(await calculateRouteKm(routeAddresses));
 
         // Fallback: If distance resolves to 0 or NaN for a multi-stop trip, prompt the user
-        if (distanceKm === null || isNaN(distanceKm) || distanceKm <= 0) {
+        if (distanceKm === null) {
           const manualInput = window.prompt("Could not auto-calculate distance. Please enter KM manually:");
           if (manualInput !== null && manualInput.trim() !== "") {
-            const parsed = parseFloat(manualInput.trim());
-            if (!isNaN(parsed) && parsed > 0) {
-              distanceKm = Math.round(parsed * 10) / 10;
-            }
+            distanceKm = positiveRoundedKm(manualInput.trim());
           }
         }
 
         // If distance still not resolved (or user canceled prompt), do NOT save 0.0 KM
-        if (distanceKm === null || isNaN(distanceKm) || distanceKm <= 0) {
+        if (distanceKm === null) {
           showAlert("Trip save cancelled: A valid distance greater than 0 KM is required.", "warning");
           return;
         }
@@ -2177,6 +2209,8 @@
           totalKm: distanceKm
         });
 
+      } catch (err) {
+        showAlert("Could not finish recording this trip. Your form is still here. " + err.message, "warning");
       } finally {
         isSubmitting = false;
         applyAuthorizationState();
@@ -2186,6 +2220,10 @@
     const recordAndSyncDrive = recordCircuit;
 
     async function saveTripToSheet(tripData) {
+      if (positiveRoundedKm(tripData.totalKm) === null) {
+        showAlert("A valid distance greater than 0 KM is required. Nothing was sent.", "warning");
+        return;
+      }
       const scriptUrl = localStorage.getItem("driving_log_script_url") || DEFAULT_CONFIG.scriptUrl;
       const btnText = document.getElementById("btnText");
       if (btnText) btnText.innerText = "Saving to Sheet...";
@@ -2218,31 +2256,28 @@
       }
 
       try {
-        const response = await fetch(scriptUrl, {
+        const data = await fetchJsonWithTimeout(scriptUrl, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
 
-        if (response.ok) { // 200 response
-          const data = await response.json();
-          if (data.success === true || data.status === "success") {
-            isSuccess = true;
-            const saved = data.trip || data;
-            confirmedKm = Number(saved.totalKm);
-            confirmedTripId = saved.tripId || saved.id || cleanTripId;
-            removeQueuedTrip(cleanTripId);
-            if (!Number.isFinite(confirmedKm) || confirmedKm <= 0) {
-              resetTripForm();
-              showAlert("Server reported saved, but mileage is missing or 0. Check this trip in the sheet before recording again and deploy the updated Code.gs.", "warning");
-              syncWithGoogleSheet(false);
-              return;
-            }
-          } else if (data.retryable !== true) {
-            removeQueuedTrip(cleanTripId);
-            showAlert(data.error || data.message || "Server rejected this trip. Check the route and try again.", "warning");
+        if (isSaveConfirmed(data)) {
+          isSuccess = true;
+          const saved = data.trip || data;
+          confirmedKm = Number(saved.totalKm);
+          confirmedTripId = saved.tripId || saved.id || cleanTripId;
+          removeQueuedTrip(cleanTripId);
+          if (!Number.isFinite(confirmedKm) || confirmedKm <= 0) {
+            resetTripForm();
+            showAlert("Server reported saved, but mileage is missing or 0. Check this trip in the sheet before recording again and deploy the updated Code.gs.", "warning");
+            syncWithGoogleSheet(false);
             return;
           }
+        } else if (data.retryable !== true) {
+          removeQueuedTrip(cleanTripId);
+          showAlert(data.error || data.message || "Server rejected this trip. Check the route and try again.", "warning");
+          return;
         }
       } catch (err) {
         console.warn("Network dispatch failed, queuing trip offline:", err);
@@ -2354,6 +2389,57 @@
         (item.id || item.tripId) !== targetId));
     }
 
+    function reconcilePendingTrips(trips) {
+      // A matching sheet ID proves the row exists, including rows repaired in Sheets.
+      // Never guess by route/date: two legitimate drives can share those details.
+      const confirmedIds = new Set(trips.map(trip => String(trip.id || trip.tripId || "")).filter(Boolean));
+      const queue = getPendingQueue();
+      const remaining = queue.filter(item => !confirmedIds.has(String(item.id || item.tripId || "")));
+      if (remaining.length !== queue.length) savePendingQueue(remaining);
+      else updateOfflineQueueBadge();
+    }
+
+    let isReviewingPending = false;
+    async function handlePendingClick() {
+      if (isReviewingPending || isProcessingPendingQueue || isSubmitting) {
+        showAlert("A trip is still being processed. Please wait for it to finish.", "info");
+        return;
+      }
+      if (!isAuthorized()) {
+        showAlert("Owner authorization is required to sync pending trips.", "warning");
+        return;
+      }
+      isReviewingPending = true;
+      try {
+        // Reconcile with edited sheet rows before attempting another write.
+        await syncWithGoogleSheet(false);
+        await processPendingQueue();
+        const stuck = getPendingQueue();
+        if (!stuck.length) return;
+        const details = stuck.map(item => `${item.date || "Unknown date"}: ${item.routeSummary || item.route || "Trip"} (${item.totalKm ?? item.km ?? "unknown"} km)`).join("\n");
+        if (window.confirm("Queue stuck? These trips could not be confirmed:\n\n" + details +
+            "\n\nClear these pending items from this device? This discards their unsaved submissions. Check the sheet first. Saved sheet rows are not deleted. Choose Cancel to keep them for retry.")) {
+          const ids = new Set(stuck.map(item => item.id || item.tripId));
+          savePendingQueue(getPendingQueue().filter(item => !ids.has(item.id || item.tripId)));
+          ["cached_trips_data", "driving_log_recent_trips", "driving_log_history"].forEach(key => {
+            try {
+              const entries = JSON.parse(localStorage.getItem(key) || "[]");
+              if (Array.isArray(entries)) localStorage.setItem(key, JSON.stringify(entries.filter(trip =>
+                !(trip.synced === false && ids.has(trip.id || trip.tripId)))));
+            } catch (err) {
+              console.warn("Could not update this history cache:", key);
+            }
+          });
+          renderRecentDrives();
+          renderTaxDashboard();
+          recalculateHeaderMetrics();
+          showAlert("Selected pending items cleared from this device.", "info");
+        }
+      } finally {
+        isReviewingPending = false;
+      }
+    }
+
     function updateOfflineQueueBadge() {
       const queue = getPendingQueue();
       const badge = document.getElementById("offlineQueueBadge");
@@ -2374,6 +2460,10 @@
 
     async function processPendingQueue() {
       if (isProcessingPendingQueue || isSubmitting || !isAuthorized()) return;
+      if (navigator.onLine === false) {
+        showAlert("You are offline. Pending trips have been kept for retry.", "warning");
+        return;
+      }
       let queue = getPendingQueue();
       if (queue.length === 0) {
         updateOfflineQueueBadge();
@@ -2402,27 +2492,25 @@
           try {
             item.secret = localStorage.getItem("driving_log_secret") || "";
 
-            const res = await fetch(scriptUrl, {
+            const data = await fetchJsonWithTimeout(scriptUrl, {
               method: "POST",
               headers: { "Content-Type": "text/plain;charset=utf-8" },
               body: JSON.stringify(item)
             });
 
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success === true || data.status === "success") {
-                syncedCount++;
-                const targetId = item.id || item.tripId;
-                removeQueuedTrip(targetId);
+            if (isSaveConfirmed(data)) {
+              syncedCount++;
+              const targetId = item.id || item.tripId;
+              removeQueuedTrip(targetId);
 
-                const saved = data.trip || data;
-                markTripAsSyncedInLocalHistory(targetId, saved.tripId || saved.id);
-              } else {
-                showAlert(data.error || data.message || "A trip could not sync and remains pending.", "warning");
-              }
+              const saved = data.trip || data;
+              markTripAsSyncedInLocalHistory(targetId, saved.tripId || saved.id);
+            } else {
+              showAlert(data.error || data.message || "A trip could not sync and remains pending.", "warning");
             }
           } catch (e) {
             console.warn("Queue item sync error:", e);
+            showAlert("Pending trip not confirmed. " + e.message, "warning");
           }
         }
       } finally {

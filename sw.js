@@ -1,4 +1,4 @@
-const CACHE_NAME = 'driving-log-v5';
+const CACHE_NAME = 'driving-log-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -26,6 +26,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Sheet refreshes must reach the network and fail visibly when offline.
+  // Never serve cached API responses in place of an edited spreadsheet.
+  const url = new URL(event.request.url);
+  if (url.hostname === 'script.google.com' || url.hostname === 'script.googleusercontent.com') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
